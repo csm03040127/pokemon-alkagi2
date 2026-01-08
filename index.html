@@ -1,0 +1,900 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>포켓몬 알까기 (v10.9 Final Integrity)</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Noto+Sans+KR:wght@400;700&display=swap');
+
+        body { margin: 0; overflow: hidden; background-color: #2c3e50; font-family: 'Noto Sans KR', sans-serif; touch-action: none; display: flex; justify-content: center; align-items: center; height: 100vh; }
+        #game-wrapper { position: relative; width: 100%; height: 100%; max-width: 500px; background-color: #eec170; box-shadow: 0 0 30px rgba(0,0,0,0.5); overflow: hidden; transition: filter 0.5s; }
+        canvas { display: block; width: 100%; height: 100%; }
+        
+        #game-wrapper.nightmare-mode { filter: grayscale(100%) contrast(1.2) brightness(0.8); background-color: #2c3e50; border: 2px solid #fff; }
+        
+        #setup-screen { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(44, 62, 80, 0.98); z-index: 50; display: flex; flex-direction: column; align-items: center; overflow-y: auto; padding: 10px 0; }
+        .setup-header { color: white; font-family: 'Black Han Sans'; font-size: 20px; margin: 10px 0; text-align: center; }
+        .pool-container { background: rgba(0,0,0,0.3); border-radius: 10px; padding: 10px; display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px; margin-bottom: 10px; width: 95%; max-height: 25vh; overflow-y: auto; }
+        .pool-item { aspect-ratio: 1; border-radius: 50%; border: 2px solid #7f8c8d; background: #ecf0f1; display: flex; justify-content: center; align-items: center; cursor: pointer; position: relative; transition: transform 0.1s; }
+        .pool-item.selected { border-color: #f1c40f; box-shadow: 0 0 10px #f1c40f; transform: scale(1.1); z-index: 10; }
+        .pool-item.taken { opacity: 0.3; cursor: not-allowed; border-color: #333; }
+        .pool-item img { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; }
+        .pool-name { position: absolute; bottom: -12px; width: 140%; text-align: center; font-size: 8px; color: white; pointer-events: none; text-shadow: 1px 1px 1px #000; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .upload-indicator { position: absolute; top: 0; right: 0; background: #2980b9; color: white; border-radius: 50%; width: 12px; height: 12px; font-size: 8px; display: none; justify-content: center; align-items: center; z-index: 5; }
+        .pool-item.has-img .upload-indicator { display: flex; background: #2ecc71; content: 'V'; }
+        
+        .upload-container { display: flex; gap: 5px; margin-bottom: 5px; align-items: center; flex-wrap: wrap; justify-content: center; }
+        .upload-btn { background-color: #3498db; color: white; border: none; border-radius: 5px; padding: 8px 15px; cursor: pointer; font-size: 14px; font-weight: bold; box-shadow: 0 2px 0 #2980b9; display: flex; align-items: center; gap: 5px; }
+        .upload-btn:disabled { background-color: #95a5a6; box-shadow: none; cursor: default; opacity: 0.7; }
+        .sub-upload-btn { background-color: #9b59b6; padding: 8px 10px; font-size: 12px; box-shadow: 0 2px 0 #8e44ad; }
+        .sub-upload-btn-2 { background-color: #e67e22; padding: 8px 10px; font-size: 12px; box-shadow: 0 2px 0 #d35400; }
+        .bg-upload-btn { background-color: #27ae60; padding: 8px 10px; font-size: 12px; box-shadow: 0 2px 0 #2ecc71; margin-left: 10px; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; }
+
+        .team-row { display: flex; gap: 8px; margin-bottom: 5px; justify-content: center; background: rgba(255,255,255,0.05); padding: 10px; border-radius: 10px; width: 90%; }
+        .team-label { color: #bdc3c7; font-size: 14px; margin-bottom: 5px; font-weight: bold; width: 90%; display: flex; justify-content: space-between; align-items: center; }
+        .slot { width: 45px; height: 45px; border-radius: 50%; border: 2px dashed #95a5a6; display: flex; justify-content: center; align-items: center; cursor: pointer; background: rgba(0,0,0,0.2); position: relative; }
+        .slot img { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; }
+        .slot.filled { border-style: solid; border-color: white; }
+        
+        .start-btn { padding: 15px 50px; font-size: 20px; font-family: 'Black Han Sans'; background-color: #27ae60; color: white; border: none; border-radius: 50px; cursor: pointer; margin-top: 5px; box-shadow: 0 4px 0 #219150; margin-bottom: 10px; }
+        .start-btn:disabled { background-color: #7f8c8d; cursor: not-allowed; box-shadow: none; }
+        .reset-btn { background: none; border: 1px solid #e74c3c; color: #e74c3c; padding: 5px 10px; border-radius: 5px; font-size: 10px; cursor: pointer; margin-bottom: 20px; }
+        .mode-btn { background: #8e44ad; color: white; border: none; padding: 8px 20px; border-radius: 20px; font-weight: bold; cursor: pointer; margin-bottom: 5px; box-shadow: 0 3px 0 #6c3483; }
+        .helper-text { font-size: 11px; color: #95a5a6; margin-bottom: 5px; text-align: center; }
+
+        .diff-selector { display: flex; gap: 5px; background: rgba(0,0,0,0.3); padding: 5px; border-radius: 20px; margin-right: 10px; }
+        .diff-btn { background: none; border: 1px solid #7f8c8d; color: #95a5a6; border-radius: 15px; padding: 2px 8px; font-size: 10px; cursor: pointer; transition: 0.2s; }
+        .diff-btn.active { color: white; border-color: white; font-weight: bold; }
+        .diff-btn[data-val="easy"].active { background: #2ecc71; border-color: #2ecc71; }
+        .diff-btn[data-val="normal"].active { background: #f1c40f; border-color: #f1c40f; }
+        .diff-btn[data-val="hard"].active { background: #e74c3c; border-color: #e74c3c; }
+
+        #ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; display: flex; flex-direction: column; justify-content: space-between; }
+        .top-bar { padding: 15px; background: linear-gradient(to bottom, rgba(0,0,0,0.4), transparent); color: white; text-align: center; font-family: 'Black Han Sans'; font-size: 24px; text-shadow: 2px 2px 0 #000; position: relative; }
+        .bottom-controls { padding: 20px; background: linear-gradient(to top, rgba(0,0,0,0.8), transparent); pointer-events: auto; display: flex; flex-direction: column; gap: 10px; align-items: center; transition: transform 0.3s; }
+        .hidden-controls { transform: translateY(150%); }
+        .action-panel { display: flex; gap: 15px; justify-content: center; width: 100%; }
+        .btn { flex: 1; padding: 15px; border: none; border-radius: 12px; font-size: 18px; font-weight: bold; color: white; cursor: pointer; box-shadow: 0 4px 0 rgba(0,0,0,0.3); font-family: 'Black Han Sans'; }
+        .btn-move { background-color: #3498db; }
+        .btn-skill { background-color: #e74c3c; }
+        .btn-skill:disabled { background-color: #95a5a6; opacity: 0.7; cursor: not-allowed; }
+        .info-text { color: #fff; text-shadow: 1px 1px 2px #000; font-size: 14px; text-align: center; min-height: 20px; }
+        #modal { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 100; display: none; pointer-events: auto; }
+        #modal h1 { color: white; font-size: 40px; margin-bottom: 20px; font-family: 'Black Han Sans'; }
+        .floating-text { position: absolute; color: yellow; font-weight: bold; font-size: 20px; text-shadow: 2px 2px 0 #000; pointer-events: none; animation: floatUp 1s ease-out forwards; z-index: 5; }
+        @keyframes floatUp { 0% { transform: translateY(0); opacity: 1; } 100% { transform: translateY(-30px); opacity: 0; } }
+    </style>
+</head>
+<body>
+
+<div id="game-wrapper">
+    <canvas id="gameCanvas"></canvas>
+    
+    <div id="setup-screen">
+        <div class="setup-header">포켓몬 알까기 (Offline)</div>
+        <button class="mode-btn" id="mode-toggle-btn" onclick="toggleMode()">모드: CPU 대전</button>
+        <div class="pool-container" id="pokemon-pool"></div>
+        <div class="upload-container">
+            <button id="btn-upload-img" class="upload-btn" onclick="triggerUpload('main')" disabled>📷 이미지</button>
+            <button id="btn-upload-token" class="upload-btn sub-upload-btn" onclick="triggerUpload('token')" disabled style="display:none;">[+] 진화체</button>
+            <button id="btn-upload-token2" class="upload-btn sub-upload-btn-2" onclick="triggerUpload('token2')" disabled style="display:none;">[+] 먹이</button>
+            <button id="btn-upload-bg" class="bg-upload-btn" onclick="triggerUpload('board')">🏟️ 배경 변경</button>
+        </div>
+        <div class="team-label">
+            <span id="top-team-label" style="color:#e74c3c; display:flex; align-items:center;">CPU 팀</span>
+            <div style="display:flex; align-items:center;">
+                <div class="diff-selector" id="diff-selector-container">
+                    <button class="diff-btn" data-val="easy" onclick="setDiff('easy')">쉬움</button>
+                    <button class="diff-btn active" data-val="normal" onclick="setDiff('normal')">보통</button>
+                    <button class="diff-btn" data-val="hard" onclick="setDiff('hard')">어려움</button>
+                </div>
+                <button onclick="randomizeCpu()" style="font-size:10px; background:#e74c3c; border:none; color:white; border-radius:3px; cursor:pointer; padding:5px;">랜덤</button>
+            </div>
+        </div>
+        <div class="team-row" id="cpu-slots"></div>
+        <div class="team-label"><span style="color:#3498db">내 팀 (Player 1)</span><button onclick="randomizePlayer()" style="font-size:10px; background:#3498db; border:none; color:white; border-radius:3px; cursor:pointer; padding:5px;">랜덤</button></div>
+        <div class="team-row" id="player-slots"></div>
+        <button id="start-btn" class="start-btn" onclick="startGame()" disabled>배틀 시작!</button>
+        <button class="reset-btn" onclick="clearAllData()">🗑️ 데이터 초기화</button>
+    </div>
+
+    <div id="ui-layer">
+        <div class="top-bar" id="turn-indicator">게임 준비</div>
+        <div id="control-panel" class="bottom-controls hidden-controls">
+            <div class="info-text" id="selected-info">-</div>
+            <div class="action-panel">
+                <button class="btn btn-move" onclick="game.setAction('move')">당겨쏘기</button>
+                <button class="btn btn-skill" id="btn-skill" onclick="game.setAction('skill')">특수효과</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal">
+        <h1 id="result-text">승리!</h1>
+        <button class="btn btn-move" onclick="returnToSetup()">팀 다시 짜기</button>
+    </div>
+</div>
+
+<input type="file" id="file-uploader" accept="image/*" style="display: none;">
+
+<script>
+window.POKEMON_DB = {
+    'daepomuno': { name: '대포무노', color: '#e74c3c', type: 'active', skill: 'cannon', desc: '물대포 발사', img: null },
+    'greninja': { name: '개굴닌자', color: '#3498db', type: 'active', skill: 'shuriken', desc: '물수리검 3개', img: null },
+    'pikachu': { name: '피카츄', color: '#f1c40f', type: 'passive', skill: 'paralyze', desc: '충돌 시 마비', img: null },
+    'froslass': { name: '눈여아', color: '#ecf0f1', type: 'passive', skill: 'freeze', desc: '충돌 시 빙결(3회)', maxUses: 3, img: null },
+    'mawile': { name: '입치트', color: '#2c3e50', type: 'passive', skill: 'eat', desc: '공격 시 적 즉사 (1회)', img: null },
+    'tauros': { name: '켄타로스', color: '#8e44ad', type: 'passive', skill: 'bulky', desc: '킬 할수록 단단해짐', img: null },
+    'zangoose': { name: '쟝고', color: '#95a5a6', type: 'active', skill: 'slash', desc: '전방 할퀴기', img: null },
+    'gengar': { name: '팬텀', color: '#5D2E8C', type: 'passive', skill: 'ghost', desc: '아군 통과 가능', img: null },
+    'mimikyu': { name: '따라큐', color: '#f39c12', type: 'passive', skill: 'disguise', desc: '첫 넉백 무효 (탈)', img: null },
+    'cofagrigus': { name: '데스니칸', color: '#2980b9', type: 'passive', skill: 'coffin', desc: '공격 시 적 가두기(1회)', maxUses: 1, img: null }, 
+    'tinkaton': { name: '두드리짱', color: '#ff79c6', type: 'active', skill: 'hammer', desc: '전방 해머 휩쓸기', img: null },
+    'ariados': { name: '아리아도스', color: '#e056fd', type: 'active', skill: 'web', desc: '이동 경로 거미줄(1회)', maxUses: 1, img: null },
+    'toxtricity': { name: '스트린더', color: '#8e44ad', type: 'active', skill: 'soundwave', desc: '관통 전자파(마비/1회)', maxUses: 1, img: null },
+    'gardevoir': { name: '가디안', color: '#2ecc71', type: 'active', skill: 'psycontrol', desc: '적 조종 팀킬유도(1회)', maxUses: 1, img: null },
+    'snorlax': { name: '잠만보', color: '#2c3e50', type: 'passive', skill: 'heavy', desc: '매우 무거움/느림', img: null },
+    'hawlucha': { name: '루차불', color: '#e67e22', type: 'passive', skill: 'multihit', desc: '2명 이상 충돌시 전원마비', img: null },
+    'shiftry': { name: '다탱구', color: '#27ae60', type: 'active', skill: 'wind', desc: '강력 광역넉백(1회)', maxUses: 1, img: null },
+    'dugtrio': { name: '닥트리오', color: '#e67e22', type: 'active', skill: 'dig', desc: '구멍파기 -> 다음 턴 광역딜(1회)', maxUses: 1, img: null },
+    'garganacl': { name: '콜로솔트', color: '#d35400', type: 'passive', skill: 'salt', desc: '첫 충돌 적 소금절이(1회)', maxUses: 1, img: null },
+    'garchomp': { name: '한카리아스', color: '#2980b9', type: 'active', skill: 'wiper', desc: '우측으로 적 쓸어내기', img: null },
+    'wobbuffet': { name: '마자용', color: '#3498db', type: 'passive', skill: 'counter', desc: '피격 시 반사(1회)', maxUses: 1, img: null },
+    'maushold': { name: '파밀리쥐', color: '#ecf0f1', type: 'passive', skill: 'popbomb', desc: '충돌 시 3단 추가타', img: null },
+    'gholdengo': { name: '타부자고', color: '#f1c40f', type: 'active', skill: 'goldrush', desc: '전방 골드러시 탄막', maxUses: 1, img: null },
+    'manectric': { name: '썬더볼트', color: '#f1c40f', type: 'passive', skill: 'voltchange', desc: '충돌 후 연쇄 추적', img: null },
+    'incineroar': { name: '어흥염', color: '#c0392b', type: 'active', skill: 'lariat', desc: '충돌 적 잡고 회전던지기(1회)', maxUses: 1, img: null },
+    'marowak': { name: '텅구리', color: '#D2B48C', type: 'active', skill: 'bonemerang', desc: '2연타 뼈다귀 부메랑', img: null },
+    'revavroom': { name: '부르르룸', color: '#bdc3c7', type: 'active', skill: 'spinout', desc: '1회용: 파워 1.5배 (이후 영구감속)', maxUses: 1, img: null },
+    'bastiodon': { name: '바리톱스', color: '#7f8c8d', type: 'active', skill: 'irondef', desc: '공격 후 적 턴동안 철벽방어', maxUses: 99, img: null },
+    'scrafty': { name: '곤율거니', color: '#d35400', type: 'passive', skill: 'moxie', desc: '처치 시 넉백파워↑', img: null },
+    'araquanid': { name: '깨비물거미', color: '#3498db', type: 'passive', skill: 'bubble', desc: '접촉 시 물먹음(3턴사망)', img: null },
+    'alcremie': { name: '마휘핑', color: '#ffb8b8', type: 'active', skill: 'decor', desc: '아군 강화 (공격력 1.5배)', maxUses: 2, img: null },
+    'comfey': { name: '큐아링', color: '#a29bfe', type: 'passive', skill: 'triage', desc: '아군과 합체하여 방어력↑', img: null },
+    'lilligant': { name: '드레디어', color: '#00b894', type: 'passive', skill: 'aroma', desc: '아군 상태이상 치료(1회)', maxUses: 1, img: null },
+    'bisharp': { name: '절각참', color: '#e17055', type: 'active', skill: 'falseswipe', desc: '관통 공격 & 받는 피해↑', maxUses: 1, img: null },
+    'aggron': { name: '보스로라', color: '#636e72', type: 'passive', skill: 'ironhead', desc: '30% 확률로 적 풀죽음', img: null },
+    'darkrai': { name: '다크라이', color: '#2d3436', type: 'active', skill: 'nightmare', desc: '악몽의 1대1 대결 (패배시 수면)', maxUses: 1, img: null },
+    'dhelmise': { name: '타타륜', color: '#273c75', type: 'active', skill: 'anchor', desc: '적을 코앞으로 끌어옴', maxUses: 1, img: null },
+    'whimsicott': { name: '엘풍', color: '#fab1a0', type: 'active', skill: 'tailwind', desc: '지나간 자리에 가속 구역 생성', maxUses: 1, img: null },
+    'tsareena': { name: '달코퀸', color: '#d63031', type: 'active', skill: 'tropkick', desc: '전방 다리 범위 발차기', maxUses: 1, img: null },
+    'dragapult': { name: '드래펄트', color: '#a29bfe', type: 'active', skill: 'phantom', desc: '장외 시 유령화 -> 드라꼰 발사', maxUses: 99, img: null, hasToken: true, tokenImg: null },
+    'vespiquen': { name: '비퀸', color: '#e17055', type: 'passive', skill: 'combee', desc: '세꿀버리 호위 (공격/방어)', img: null, hasToken: true, tokenImg: null },
+    'larvesta': { name: '활화르바', color: '#ff7675', type: 'passive', skill: 'evolve', desc: '5턴 후 불카모스 진화 (초반 약함)', img: null, hasToken: true, tokenImg: null },
+    'bewear': { name: '이븐곰', color: '#fd79a8', type: 'active', skill: 'gigaimpact', desc: '3배 돌진 후 1턴 행동불가', maxUses: 1, img: null },
+    'golisopod': { name: '갑주무사', color: '#b2bec3', type: 'passive', skill: 'firstimp', desc: '첫 충돌 시 2배 넉백', maxUses: 1, img: null },
+    'mewtwo': { name: '뮤츠', color: '#6c5ce7', type: 'active', skill: 'teleport', desc: '적과 위치 교환', maxUses: 1, img: null },
+    'teddiursa': { name: '깜지곰', color: '#e1b12c', type: 'passive', skill: 'summon', desc: '사망 시 링곰 소환', img: null, hasToken: true, tokenImg: null },
+    'decidueye': { name: '모크나이퍼', color: '#009432', type: 'active', skill: 'shackle', desc: '적을 그림자에 가둠(5턴)', maxUses: 1, img: null },
+    'machamp': { name: '괴력몬', color: '#7f8fa6', type: 'active', skill: 'closecombat', desc: '전방 연속 펀치 (10->5)', maxUses: 99, img: null },
+    'shedinja': { name: '껍질몬', color: '#f5cd79', type: 'passive', skill: 'wonderguard', desc: '직접 공격 통과 (아군존재시)', img: null },
+    'mismagius': { name: '무우마직', color: '#574b90', type: 'passive', skill: 'chant', desc: '충돌 시 적:저주 / 아군:축복', img: null },
+    'mareanie': { name: '시마사리', color: '#6a89cc', type: 'active', skill: 'hunt', desc: '코산호 소환&포식 -> 맹독 진화', maxUses: 1, img: null, hasToken: true, tokenCount: 2, tokenImg: null, tokenImg2: null }, 
+    'salamence': { name: '보만다', color: '#74b9ff', type: 'active', skill: 'outrage', desc: '3턴간 적 추격 난동', maxUses: 1, img: null },
+    'gimmighoul': { name: '모으령', color: '#f1c40f', type: 'passive', skill: 'coin', desc: '코인 10개 수집 시 타부자고 진화', img: null, hasToken: true, tokenImg: null },
+    'corsola': { name: '코산호', color: '#ff9ff3', type: 'passive', skill: 'none', desc: '먹이', img: null }
+};
+
+window.ALL_KEYS = Object.keys(POKEMON_DB);
+window.cpuTeam = [null, null, null, null, null];
+window.playerTeam = [null, null, null, null, null];
+window.selectedPoolKey = null;
+window.cpuDifficulty = 'normal';
+window.gameMode = 'cpu';
+window.uploadMode = 'main';
+window.boardImg = null;
+
+// Local Storage Load
+function loadLocalData() {
+    const saved = localStorage.getItem('alkagi_data');
+    if(saved) {
+        try {
+            const data = JSON.parse(saved);
+            window.cpuTeam = data.cpuTeam || [null, null, null, null, null];
+            window.playerTeam = data.playerTeam || [null, null, null, null, null];
+        } catch(e) { console.error("Save load failed", e); }
+    }
+}
+function saveLocalData() {
+    localStorage.setItem('alkagi_data', JSON.stringify({
+        cpuTeam: window.cpuTeam,
+        playerTeam: window.playerTeam
+    }));
+}
+loadLocalData();
+window.onload = function() {
+    initSetup();
+};
+
+window.toggleMode = () => {
+    window.gameMode = window.gameMode === 'cpu' ? 'pvp' : 'cpu';
+    const btn = document.getElementById('mode-toggle-btn');
+    const label = document.getElementById('top-team-label');
+    const diff = document.getElementById('diff-selector-container');
+    if (window.gameMode === 'pvp') {
+        btn.innerText = "모드: 2인 대전 (PvP)";
+        btn.style.background = "#e67e22";
+        label.innerText = "Player 2 (상단)";
+        diff.style.display = 'none';
+    } else {
+        btn.innerText = "모드: CPU 대전";
+        btn.style.background = "#8e44ad";
+        label.innerText = "CPU 팀";
+        diff.style.display = 'flex';
+    }
+};
+
+window.setDiff = (lvl) => {
+    window.cpuDifficulty = lvl;
+    document.querySelectorAll('.diff-btn').forEach(b => b.classList.remove('active'));
+    document.querySelector(`.diff-btn[data-val="${lvl}"]`).classList.add('active');
+};
+
+window.clearAllData = () => {
+    if(!confirm("정말 모든 데이터를 삭제할까요?")) return;
+    window.cpuTeam=[null,null,null,null,null]; window.playerTeam=[null,null,null,null,null];
+    saveLocalData();
+    location.reload();
+};
+
+const fileInput = document.getElementById('file-uploader');
+window.triggerUpload = function(mode) { 
+    if (mode !== 'board' && !window.selectedPoolKey) return; 
+    window.uploadMode = mode;
+    fileInput.click(); 
+}
+fileInput.addEventListener('change', (e) => {
+    const f = e.target.files[0];
+    if (f) {
+        const r = new FileReader();
+        r.onload = (evt) => {
+            const img = new Image();
+            img.onload = () => {
+                const mode = window.uploadMode;
+                if(mode === 'board'){
+                    // Board Optimization
+                    const canvas = document.createElement('canvas');
+                    const scale = 600 / img.width;
+                    canvas.width = 600;
+                    canvas.height = img.height * scale;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                    const compressedData = canvas.toDataURL('image/jpeg', 0.7); 
+                    const newImg = new Image(); newImg.src = compressedData;
+                    window.boardImg = newImg;
+                } else if(window.selectedPoolKey) {
+                    const canvas = document.createElement('canvas'); canvas.width = 120; canvas.height = 120;
+                    const ctx = canvas.getContext('2d'); ctx.drawImage(img, 0, 0, 120, 120);
+                    // No cloud save, just memory
+                    const dbEntry = window.POKEMON_DB[window.selectedPoolKey];
+                    if(mode === 'token') dbEntry.tokenImg = img;
+                    else if(mode === 'token2') dbEntry.tokenImg2 = img;
+                    else dbEntry.img = img;
+                    window.renderPool(); window.renderSlots();
+                }
+            };
+            img.src = evt.target.result;
+        };
+        r.readAsDataURL(f);
+    }
+    fileInput.value = '';
+});
+
+window.initSetup = function() { window.renderPool(); window.renderSlots(); window.checkStartReady(); };
+window.isTaken = function(key) { return window.cpuTeam.includes(key) || window.playerTeam.includes(key); };
+window.renderPool = function() {
+    const pool = document.getElementById('pokemon-pool'); pool.innerHTML = '';
+    const upBtn = document.getElementById('btn-upload-img');
+    const tokenBtn = document.getElementById('btn-upload-token');
+    const tokenBtn2 = document.getElementById('btn-upload-token2');
+    
+    if(window.selectedPoolKey) {
+        upBtn.disabled = false; upBtn.style.opacity = "1";
+        const entry = window.POKEMON_DB[window.selectedPoolKey];
+        if(entry.hasToken){
+            tokenBtn.style.display = "flex"; tokenBtn.disabled = false;
+            tokenBtn.innerText = entry.pokeKey === 'mareanie' ? '[+] 진화체' : '[+] 토큰';
+            if(entry.tokenCount === 2){
+                tokenBtn2.style.display = "flex"; tokenBtn2.disabled = false;
+            } else {
+                tokenBtn2.style.display = "none";
+            }
+        } else {
+            tokenBtn.style.display = "none";
+            tokenBtn2.style.display = "none";
+        }
+    } else {
+        upBtn.disabled = true; upBtn.style.opacity = "0.5";
+        tokenBtn.style.display = "none";
+        tokenBtn2.style.display = "none";
+    }
+
+    window.ALL_KEYS.forEach(key => {
+        if(key === 'corsola' || key === 'gholdengo') return; 
+        const p = window.POKEMON_DB[key]; const taken = window.isTaken(key);
+        const el = document.createElement('div'); el.className = `pool-item ${taken ? 'taken' : ''} ${p.img ? 'has-img' : ''}`;
+        if (window.selectedPoolKey === key) el.classList.add('selected');
+        el.onclick = () => { if (taken) return; window.selectedPoolKey = key; window.renderPool(); };
+        el.innerHTML = `<div class="upload-indicator">V</div><div class="img-content" id="img-pool-${key}" style="width:100%;height:100%;border-radius:50%;display:flex;justify-content:center;align-items:center;overflow:hidden;">${p.img ? '' : '<span style="color:#7f8c8d;font-size:20px;">?</span>'}</div><div class="pool-name">${p.name}</div>`;
+        if(p.img) el.querySelector('.img-content').appendChild(p.img);
+        pool.appendChild(el);
+    });
+};
+window.toggleSlot = function(side, index) {
+    const team = (side === 'cpu') ? window.cpuTeam : window.playerTeam;
+    if (team[index] !== null) team[index] = null;
+    else if (window.selectedPoolKey) { if (window.isTaken(window.selectedPoolKey)) return; team[index] = window.selectedPoolKey; window.selectedPoolKey = null; }
+    saveLocalData(); window.renderPool(); window.renderSlots(); window.checkStartReady();
+};
+window.renderSlots = function() {
+    const draw = (arr, elId, side) => {
+        const p = document.getElementById(elId); p.innerHTML = '';
+        arr.forEach((key, idx) => {
+            const div = document.createElement('div'); div.className = `slot ${key ? 'filled' : ''}`; div.onclick = () => window.toggleSlot(side, idx);
+            if (key) { const d = window.POKEMON_DB[key]; if (d.img) { const img = new Image(); img.src = d.img.src; div.appendChild(img); } else { div.style.backgroundColor = d.color; div.innerText = d.name[0]; div.style.color = 'white'; div.style.fontWeight = 'bold'; } } else { div.innerText = "+"; div.style.color = "#95a5a6"; }
+            p.appendChild(div);
+        });
+    };
+    draw(window.cpuTeam, 'cpu-slots', 'cpu'); draw(window.playerTeam, 'player-slots', 'player');
+};
+window.randomizeCpu = function() { window.fillRandom(window.cpuTeam); }; window.randomizePlayer = function() { window.fillRandom(window.playerTeam); };
+window.fillRandom = function(arr) {
+    for(let i=0; i<5; i++) { if(arr[i] === null) { const avail = window.ALL_KEYS.filter(k => !window.isTaken(k) && k!=='corsola' && k!=='gholdengo'); if(avail.length === 0) break; arr[i] = avail[Math.floor(Math.random() * avail.length)]; } }
+    saveLocalData(); window.renderPool(); window.renderSlots(); window.checkStartReady();
+};
+window.checkStartReady = function() { const ready = window.cpuTeam.filter(k=>k).length > 0 && window.playerTeam.filter(k=>k).length > 0; const btn = document.getElementById('start-btn'); btn.disabled = !ready; btn.innerText = ready ? "배틀 시작!" : "최소 1마리씩 배치하세요"; };
+window.startGame = function() { document.getElementById('setup-screen').style.display = 'none'; if (!window.game) window.game = new Game(window.cpuTeam, window.playerTeam, window.gameMode); else window.game.initGame(window.cpuTeam, window.playerTeam, window.gameMode); };
+window.returnToSetup = function() { document.getElementById('modal').style.display = 'none'; document.getElementById('setup-screen').style.display = 'flex'; };
+
+// --- Game Logic ---
+class Vector { constructor(x,y){this.x=x;this.y=y;} add(v){return new Vector(this.x+v.x,this.y+v.y);} sub(v){return new Vector(this.x-v.x,this.y-v.y);} mult(n){return new Vector(this.x*n,this.y*n);} mag(){return Math.sqrt(this.x*this.x+this.y*this.y);} normalize(){let m=this.mag();return m===0?new Vector(0,0):new Vector(this.x/m,this.y/m);} dist(v){return Math.sqrt((this.x-v.x)**2+(this.y-v.y)**2);} copy(){return new Vector(this.x, this.y);} }
+class Web { constructor(pos){this.pos=pos;this.radius=15;this.life=600;} }
+class Wind { constructor(pos){this.pos=pos;this.radius=25;this.life=180;} }
+class Minion { constructor(id, parentId, offset){this.id=id; this.parentId=parentId; this.offset=offset; this.active=true;} }
+class GoldCoin { constructor(pos){this.pos=pos; this.radius=10;} }
+class Stone {
+    constructor(id,x,y,owner,pokeKey){
+        this.id=id;this.pos=new Vector(x,y);this.vel=new Vector(0,0);
+        this.owner=owner;this.pokeKey=pokeKey;this.data=window.POKEMON_DB[pokeKey];
+        if(!this.data) { this.data = { name: 'Unknown', color: '#999', img: null }; } 
+        this.radius=0;this.mass=1;this.friction=0.93;
+        this.isDead=false;this.frozenTurns=0;this.isParalyzed=false;this.trappedTurns=0;this.stunnedTurns=0;
+        this.disguise=(pokeKey==='mimikyu');this.canEat=(pokeKey==='mawile');
+        this.usesLeft=this.data.maxUses!==undefined?this.data.maxUses:999;
+        if(pokeKey==='tauros')this.baseMass=1; if(pokeKey==='snorlax'){this.mass=2.0;this.friction=0.90;}
+        this.hitVictims=[];this.trappedBy=null;this.isDigging=false;this.isSalted=false;this.saltStacks=0;
+        this.goldRushTimer=0; this.popBombStacks=0; this.swingState=null; this.isGrabbed=false; this.swingReady=false; this.hasRicocheted=false; this.isWebbing=false;
+        this.killCount=0; this.isSlowed=false; this.ironDefenseActive=false; this.ironDefenseCooldown=0; this.wantsIronDefense=false; 
+        this.waterloggedTurns=0; this.isDecorated=false; this.hasComfey=false; this.markedByBisharp=false; this.isPiercing=false; this.wantsDecor=false;
+        this.wantsNightmare=false; this.isSleeping=false; this.inNightmare=false; this.isTailwindActive=false; 
+        this.firstImpressionUsed=false; 
+        this.isGhost=false; this.ghostPos=null; this.hasFiredThisTurn=false; 
+        this.firedByOwner=false; this.hitCount=0; 
+        this.minions=[];
+        if(pokeKey==='vespiquen'){
+            this.minions.push(new Minion(1, id, new Vector(22, -18))); 
+            this.minions.push(new Minion(2, id, new Vector(22, 18)));  
+            this.minions.push(new Minion(3, id, new Vector(-28, 0)));  
+        }
+        this.evolutionTurn=0; this.isEvolved=false;
+        this.toxicTurns=0; 
+        this.isThrashing=false; this.thrashTurns=0; this.isResting=false;
+        this.shadowBindTurns=0; this.shadowCenter=null;
+        this.punchCount=10; this.isPunching=false; this.punchTicks=0; this.punchDir=null;
+        this.chantUsedOn = []; 
+        this.cursed=false; this.blessed=false;
+        this.coinsCollected=0; 
+    }
+    update(){
+        if(this.isGhost) return; 
+        if(this.isDead||this.trappedTurns>0||this.isGrabbed)return;
+        if(this.shadowBindTurns > 0 && this.shadowCenter){
+            let dist = this.pos.dist(this.shadowCenter);
+            if(dist > 55){ 
+                let pull = this.shadowCenter.sub(this.pos).normalize().mult(5); 
+                this.vel = this.vel.add(pull);
+            }
+        }
+        this.pos=this.pos.add(this.vel);
+        let f=this.isParalyzed?0.85:this.friction;
+        if(this.isSalted){let decay=0.05+(this.saltStacks*0.03);if(this.vel.mag()>0.1){let nm=Math.max(0,this.vel.mag()-decay);this.vel=this.vel.normalize().mult(nm);}}
+        this.vel=this.vel.mult(f);if(this.vel.mag()<0.2)this.vel=new Vector(0,0);
+    }
+    draw(ctx){
+        if(this.isGhost) {
+            if(this.ghostPos){
+                ctx.save(); ctx.globalAlpha=0.6;
+                ctx.beginPath(); ctx.arc(this.ghostPos.x, this.ghostPos.y, this.radius, 0, Math.PI*2);
+                if(this.data.img) ctx.drawImage(this.data.img, this.ghostPos.x-this.radius, this.ghostPos.y-this.radius, this.radius*2, this.radius*2);
+                else { ctx.fillStyle='#a29bfe'; ctx.fill(); }
+                ctx.strokeStyle='white'; ctx.lineWidth=3; ctx.stroke();
+                ctx.fillStyle='white'; ctx.font='10px sans-serif'; ctx.textAlign='center'; ctx.fillText(this.hasFiredThisTurn?'대기':'유령', this.ghostPos.x, this.ghostPos.y+this.radius+12);
+                ctx.restore();
+            }
+            return;
+        }
+        if(this.isDead) return;
+        ctx.save();if(this.isDigging)ctx.globalAlpha=0.4;
+        if(this.pokeKey==='vespiquen'){
+            this.minions.forEach(m => {
+                if(m.active){
+                    let mPos = this.pos.add(m.offset);
+                    ctx.beginPath(); ctx.arc(mPos.x, mPos.y, 14, 0, Math.PI*2); 
+                    if(this.data.tokenImg) {
+                        ctx.save(); ctx.clip(); ctx.drawImage(this.data.tokenImg, mPos.x-14, mPos.y-14, 28, 28); ctx.restore();
+                    } else {
+                        ctx.fillStyle='#f1c40f'; ctx.fill(); ctx.strokeStyle='#000'; ctx.stroke();
+                    }
+                }
+            });
+        }
+        ctx.beginPath();ctx.arc(this.pos.x,this.pos.y,this.radius+2,0,Math.PI*2);
+        ctx.fillStyle=(this.owner==='player')?'#3498db':'#e74c3c';ctx.fill();
+        ctx.beginPath();ctx.arc(this.pos.x,this.pos.y,this.radius,0,Math.PI*2);ctx.clip();
+        let imgToDraw = this.data.img;
+        if(this.isEvolved) {
+            if(this.pokeKey==='larvesta' && this.data.tokenImg) imgToDraw = this.data.tokenImg;
+            if(this.pokeKey==='teddiursa' && this.data.tokenImg) imgToDraw = this.data.tokenImg;
+            if(this.pokeKey==='toxapex' && this.data.tokenImg) imgToDraw = this.data.tokenImg; 
+            if(this.pokeKey==='gholdengo' && this.data.img) imgToDraw = this.data.img; 
+        }
+        if(imgToDraw)ctx.drawImage(imgToDraw,this.pos.x-this.radius,this.pos.y-this.radius,this.radius*2,this.radius*2);
+        else{ctx.fillStyle=this.data.color;ctx.fill();ctx.fillStyle='#fff';ctx.font=`bold ${this.radius}px "Black Han Sans"`;ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(this.data.name.substring(0,2),this.pos.x,this.pos.y);}
+        ctx.restore();
+        if(this.frozenTurns>0){ctx.beginPath();ctx.arc(this.pos.x,this.pos.y,this.radius,0,Math.PI*2);ctx.fillStyle='rgba(100,200,255,0.5)';ctx.fill();ctx.fillStyle='white';ctx.font='20px sans-serif';ctx.textAlign='center';ctx.fillText('❄️',this.pos.x,this.pos.y);}
+        if(this.isParalyzed){ctx.fillStyle='white';ctx.font='20px sans-serif';ctx.textAlign='center';ctx.fillText('⚡',this.pos.x,this.pos.y-this.radius/2);}
+        if(this.disguise){ctx.beginPath();ctx.arc(this.pos.x,this.pos.y,this.radius,0,Math.PI*2);ctx.strokeStyle='gold';ctx.lineWidth=3;ctx.stroke();}
+        if(this.isSalted){ctx.fillStyle='#d35400';ctx.font='12px sans-serif';ctx.textAlign='center';ctx.fillText('🧂',this.pos.x+this.radius,this.pos.y);}
+        if(this.stunnedTurns>0){ctx.fillStyle='gold';ctx.font='20px sans-serif';ctx.textAlign='center';ctx.fillText('⭐',this.pos.x,this.pos.y-this.radius);}
+        if(this.isSleeping){ctx.fillStyle='white';ctx.font='bold 20px sans-serif';ctx.textAlign='center';ctx.fillText('Zzz',this.pos.x,this.pos.y-this.radius);}
+        if(this.ironDefenseActive){
+            ctx.beginPath();ctx.arc(this.pos.x,this.pos.y,this.radius+6,0,Math.PI*2);ctx.strokeStyle='#bdc3c7';ctx.lineWidth=5;ctx.stroke();
+            ctx.fillStyle='#bdc3c7';ctx.font='10px sans-serif';ctx.textAlign='center';ctx.fillText('🛡️철벽',this.pos.x,this.pos.y-this.radius-5);
+        }
+        if(this.isSlowed){ctx.fillStyle='#555';ctx.font='12px sans-serif';ctx.textAlign='center';ctx.fillText('🐢',this.pos.x-this.radius,this.pos.y);}
+        if(this.waterloggedTurns>0){ctx.beginPath();ctx.arc(this.pos.x,this.pos.y,this.radius,0,Math.PI*2);ctx.fillStyle='rgba(52, 152, 219, 0.4)';ctx.fill();ctx.fillStyle='white';ctx.font='bold 16px sans-serif';ctx.textAlign='center';ctx.fillText(this.waterloggedTurns,this.pos.x,this.pos.y);}
+        if(this.pokeKey==='scrafty'&&this.killCount>0){ctx.beginPath();ctx.arc(this.pos.x,this.pos.y,this.radius+2,0,Math.PI*2);ctx.strokeStyle='#c0392b';ctx.lineWidth=2+this.killCount;ctx.stroke();}
+        if(this.toxicTurns>0){ctx.fillStyle='#8e44ad';ctx.font='bold 16px sans-serif';ctx.textAlign='center';ctx.fillText(this.toxicTurns+'☠️',this.pos.x,this.pos.y-this.radius);}
+        if(this.pokeKey==='gimmighoul' && !this.isEvolved){ctx.fillStyle='gold';ctx.font='bold 14px sans-serif';ctx.textAlign='center';ctx.fillText(this.coinsCollected+'/10',this.pos.x,this.pos.y-this.radius-5);}
+        if(this.isDecorated){ctx.fillStyle='white';ctx.font='16px sans-serif';ctx.textAlign='center';ctx.fillText('🍰',this.pos.x+this.radius*0.7,this.pos.y-this.radius*0.7);}
+        if(this.hasComfey){ctx.fillStyle='white';ctx.font='16px sans-serif';ctx.textAlign='center';ctx.fillText('🌸',this.pos.x-this.radius*0.7,this.pos.y-this.radius*0.7);}
+        if(this.markedByBisharp){ctx.fillStyle='red';ctx.font='16px sans-serif';ctx.textAlign='center';ctx.fillText('💢',this.pos.x,this.pos.y);}
+        if(this.isPiercing){ctx.beginPath();ctx.arc(this.pos.x,this.pos.y,this.radius+4,0,Math.PI*2);ctx.strokeStyle='#e17055';ctx.lineWidth=3;ctx.setLineDash([5,3]);ctx.stroke();ctx.setLineDash([]);}
+        if(this.isThrashing){ctx.fillStyle='red';ctx.font='16px sans-serif';ctx.textAlign='center';ctx.fillText('💢',this.pos.x,this.pos.y-this.radius-5);}
+        if(this.isResting){ctx.fillStyle='#555';ctx.font='16px sans-serif';ctx.textAlign='center';ctx.fillText('💤',this.pos.x,this.pos.y-this.radius-5);}
+        if(this.cursed){ctx.fillStyle='#574b90';ctx.font='12px sans-serif';ctx.textAlign='center';ctx.fillText('▼',this.pos.x+this.radius,this.pos.y-this.radius);}
+        if(this.blessed){ctx.fillStyle='#574b90';ctx.font='12px sans-serif';ctx.textAlign='center';ctx.fillText('▲',this.pos.x+this.radius,this.pos.y-this.radius);}
+    }
+}
+class Projectile{constructor(x,y,v,t,r,o,target){this.pos=new Vector(x,y);this.vel=v;this.type=t;this.radius=r;this.owner=o;this.life=60;this.target=target;this.img=null;}update(){this.pos=this.pos.add(this.vel);this.life--;}draw(c){
+    c.beginPath();c.arc(this.pos.x,this.pos.y,this.radius,0,Math.PI*2);
+    if(this.img){c.save();c.clip();c.drawImage(this.img,this.pos.x-this.radius,this.pos.y-this.radius,this.radius*2,this.radius*2);c.restore();}
+    else {
+        if(this.type==='soundwave')c.fillStyle='#e056fd';else if(this.type==='coin')c.fillStyle='#f1c40f';else if(this.type==='bone')c.fillStyle='#D2B48C';else if(this.type==='anchor')c.fillStyle='#273c75';else if(this.type==='dreepy')c.fillStyle='#a29bfe';else if(this.type==='combee')c.fillStyle='#f1c40f';else if(this.type==='spirit_arrow')c.fillStyle='#009432';else if(this.type==='fist')c.fillStyle='#7f8fa6';else c.fillStyle=(this.type==='shuriken')?'#3498db':'#2980b9';
+        c.fill();c.strokeStyle='white';c.stroke();
+    }
+}}
+
+class Game {
+    constructor(c,p,mode){this.cvs=document.getElementById('gameCanvas');this.ctx=this.cvs.getContext('2d');this.sts=[];this.pjs=[];this.eff=[];this.wbs=[];this.winds=[];this.coins=[];this.initGame(c,p,mode);this.setInput();this.loop();}
+    initGame(c,p,mode){
+        this.sts=[];this.pjs=[];this.eff=[];this.wbs=[];this.winds=[];this.coins=[];this.turn='player';this.ph='idle';this.chg=false;this.tmr=0;this.mode=mode;this.processingTurn=false;
+        this.nightmareMode=false; this.nightmareTimer=0; this.nightmarePair=[];
+        this.resolvingTurnStart=false;
+        this.rsz();
+        const r=this.cvs.width/14,w=this.cvs.width,h=this.cvs.height;
+        let hasGimmighoul = false;
+        c.forEach((k,i)=>{if(k){let s=new Stone(i,w/2+(i-2)*(r*2.5),h*0.15,'cpu',k);s.radius=r;this.sts.push(s); if(k==='gimmighoul') hasGimmighoul=true;}});
+        p.forEach((k,i)=>{if(k){let s=new Stone(i+5,w/2+(i-2)*(r*2.5),h*0.85,'player',k);s.radius=r;this.sts.push(s); if(k==='gimmighoul') hasGimmighoul=true;}});
+        if(hasGimmighoul){
+            for(let i=0; i<10; i++){
+                this.coins.push(new GoldCoin(new Vector(Math.random()*(w-40)+20, Math.random()*(h-40)+20)));
+            }
+        }
+        if(this.updUI) this.updUI();
+    }
+    rsz(){this.cvs.width=document.getElementById('game-wrapper').offsetWidth;this.cvs.height=document.getElementById('game-wrapper').offsetHeight;}
+    setInput(){
+        const st=(e)=>{
+            if(this.ph!=='idle')return;
+            const p=this.gPos(e);
+            let owner = this.turn === 'player' ? 'player' : 'cpu';
+            if(owner === 'cpu' && this.mode !== 'pvp') return;
+
+            if(this.act === 'skill' && this.sel && this.sel.pokeKey === 'mewtwo'){
+                const enemy = this.sts.find(s=>!s.isDead && !s.isGhost && s.owner!==owner && s.pos.dist(p)<s.radius*1.5);
+                if(enemy){
+                    let temp = this.sel.pos.copy(); this.sel.pos = enemy.pos.copy(); enemy.pos = temp;
+                    this.flt(this.sel.pos, "순간이동!", "#6c5ce7"); this.flt(enemy.pos, "순간이동!", "#6c5ce7");
+                    this.sel.usesLeft--; this.act = null; this.sel = null; this.end(true); return;
+                }
+            }
+
+            let c=this.sts.find(s=>!s.isDead&&s.trappedTurns<=0&&s.stunnedTurns<=0&&!s.isSleeping&&!s.isResting&&s.owner===owner&&s.pos.dist(p)<s.radius*1.5);
+            if(!c){ c = this.sts.find(s=>s.isGhost && s.owner===owner && s.ghostPos && s.ghostPos.dist(p)<s.radius*2.0); }
+            if(this.nightmareMode && c && !c.inNightmare) return;
+
+            if(c){
+                if(c.isGhost && c.hasFiredThisTurn) return;
+                if(!c.data) return; // Safety check
+                if(c.frozenTurns>0){this.flt(c.pos,"얼음!","cyan");return;}
+                this.sel=c;this.act='move';this.ctl(true);
+                if(c.isGhost) this.act='ghost_shot';
+            } else if(this.sel){
+                this.ds=p;this.dc=p;this.ph='aim';
+            }
+        };
+        const mv=(e)=>{if(this.ph==='aim'){e.preventDefault();this.dc=this.gPos(e);}};
+        const ed=(e)=>{if(this.ph==='aim')this.exe();};
+        this.cvs.onmousedown=st;window.onmousemove=mv;window.onmouseup=ed;this.cvs.ontouchstart=(e)=>st(e);window.ontouchmove=(e)=>mv(e);window.ontouchend=ed;
+    }
+    gPos(e){const r=this.cvs.getBoundingClientRect(),x=(e.changedTouches?e.changedTouches[0].clientX:e.clientX)-r.left,y=(e.changedTouches?e.changedTouches[0].clientY:e.clientY)-r.top;return new Vector(x,y);}
+    setAction(t){this.act=t;}
+    castSkill(a, d, p) {
+        if(a.pokeKey!=='bastiodon' && a.pokeKey!=='machamp' && a.pokeKey!=='gimmighoul' && a.pokeKey!=='gholdengo') a.usesLeft--;
+        if(a.pokeKey==='bastiodon'){a.wantsIronDefense=true;a.ironDefenseCooldown=3;this.flt(a.pos,"방어 준비!","#7f8c8d");a.vel=d.mult(p);}
+        else if(a.pokeKey==='gholdengo'){a.goldRushTimer=120; this.flt(a.pos,"골드러시!","#f1c40f"); a.vel=d.mult(p);}
+        else if(a.pokeKey==='revavroom'){a.vel=d.mult(p * 1.5);a.isSlowed=true;this.flt(a.pos,"오버히트!","#bdc3c7");}
+        else if(a.pokeKey==='alcremie'){a.wantsDecor=true;a.vel=d.mult(p);this.flt(a.pos,"데코레이션!","#ffb8b8");}
+        else if(a.pokeKey==='bisharp'){a.isPiercing=true; a.vel=d.mult(p*1.2); this.flt(a.pos,"칼등치기!","#e17055");}
+        else if(a.pokeKey==='darkrai'){a.wantsNightmare=true; a.vel=d.mult(p); this.flt(a.pos,"나이트메어...","#2d3436");}
+        else if(a.pokeKey==='whimsicott'){a.isTailwindActive=true; a.vel=d.mult(p); this.flt(a.pos,"순풍!","#fab1a0");}
+        else if(a.pokeKey==='bewear'){a.vel=d.mult(p * 3); a.stunnedTurns=2; this.flt(a.pos,"기가임팩트!","#fd79a8");}
+        else if(a.pokeKey==='tsareena'){a.vel=new Vector(0,0); this.eff.push({t:'tropkick',p:a.pos,d:d,l:20}); const legLen = 220; const legWidth = 40; this.sts.forEach(t=>{if(t!==a && !t.isDead && !t.isGhost && t.owner!==a.owner){let vec=t.pos.sub(a.pos);let distAlong=vec.x*d.x+vec.y*d.y;let distPerp=Math.abs(vec.x*d.y-vec.y*d.x);if(distAlong>0&&distAlong<legLen&&distPerp<legWidth){t.vel=t.pos.sub(a.pos).normalize().mult(35);this.flt(t.pos,"트로피컬킥!","#d63031");}}});}
+        else if(a.pokeKey==='decidueye'){this.pjs.push(new Projectile(a.pos.x, a.pos.y, d.mult(25), 'spirit_arrow', 5, a.owner)); this.flt(a.pos, "그림자꿰매기!", "#009432");}
+        else if(a.pokeKey==='machamp'){a.isPunching = true; a.punchDir = d; a.punchTicks = 0; this.flt(a.pos, "인파이트!", "#7f8fa6");}
+        else if(a.pokeKey==='teddiursa' && a.isEvolved){if(!a.isThrashing){a.isThrashing = true; a.thrashTurns = 3; this.flt(a.pos, "난동부리기!", "#e1b12c"); this.resolvingTurnStart = true; let target = null, md = 9999; this.sts.forEach(t => { if(!t.isDead && !t.isGhost && t.owner!==a.owner){let dist = a.pos.dist(t.pos); if(dist < md){ md = dist; target = t; } } }); if(target) a.vel = target.pos.sub(a.pos).normalize().mult(25); else a.vel = new Vector(Math.random()-0.5, Math.random()-0.5).normalize().mult(15);}}
+        else if(a.pokeKey==='salamence'){if(!a.isThrashing){a.isThrashing = true; a.thrashTurns = 3; this.flt(a.pos, "역린!", "#74b9ff"); this.resolvingTurnStart = true; let target = null, md = 9999; this.sts.forEach(t => { if(!t.isDead && !t.isGhost && t.owner!==a.owner){let dist = a.pos.dist(t.pos); if(dist < md){ md = dist; target = t; } } }); if(target) a.vel = target.pos.sub(a.pos).normalize().mult(30); else a.vel = new Vector(Math.random()-0.5, Math.random()-0.5).normalize().mult(20);}}
+        else if(a.pokeKey==='mareanie'){let yMin = (a.owner === 'player') ? 50 : this.cvs.height/2 + 50; let yMax = (a.owner === 'player') ? this.cvs.height/2 - 50 : this.cvs.height - 50; let spawnPos = null; for(let i=0; i<15; i++){let tx = Math.random()*(this.cvs.width-100)+50; let ty = Math.random()*(yMax-yMin)+yMin; let testPos = new Vector(tx, ty); let safe = true; for(let s of this.sts){if(!s.isDead && s.pos.dist(testPos) < s.radius + 30) { safe = false; break; }} if(safe) { spawnPos = testPos; break; }} if(spawnPos){let corsola = new Stone(Date.now(), spawnPos.x, spawnPos.y, a.owner==='player'?'cpu':'player', 'corsola'); corsola.owner = (a.owner==='player') ? 'cpu' : 'player'; corsola.pokeKey = 'corsola'; corsola.radius = a.radius; corsola.data = { name: '코산호', color: '#ff9ff3', img: null }; if(window.POKEMON_DB['mareanie'].tokenImg2) corsola.data.img = window.POKEMON_DB['mareanie'].tokenImg2; this.sts.push(corsola); this.flt(a.pos, "먹이 발견!", "#6a89cc");} else {this.flt(a.pos, "공간 부족...", "gray");} a.vel=d.mult(p);}
+        else this.skl(a,d,p);
+    }
+    exe(){
+        if(!this.sel||!this.ds)return;const pl=this.ds.sub(this.dc);if(pl.mag()<10){this.ph='idle';this.ds=null;return;}
+        const d=pl.normalize(); let p=Math.min(pl.mag()*0.15,25);
+        if(this.sel.isSlowed) p*=0.8; if(this.sel.isEvolved) p*=1.5; 
+        this.ctl(false);this.ph='mov';this.chg=false;this.tmr=0;this.sel.hitVictims=[];
+        this.sel.firedByOwner = true; this.sel.hitCount = 0;
+        if(this.act==='ghost_shot'){
+            let dreepy = new Projectile(this.sel.ghostPos.x, this.sel.ghostPos.y, d.mult(20), 'dreepy', 18, this.sel.owner);
+            if(this.sel.data.tokenImg) dreepy.img = this.sel.data.tokenImg;
+            this.pjs.push(dreepy); this.flt(this.sel.ghostPos, "드라꼰!", "#a29bfe");
+            this.sel.hasFiredThisTurn = true; this.ds=null; this.sel=null; this.ph='mov'; this.processingTurn = false; this.freeAction = true; return;
+        }
+        if(this.act==='move')this.sel.vel=d.mult(p);
+        else this.castSkill(this.sel, d, p);
+        if(this.sel.pokeKey==='ariados'&&this.act==='skill'){this.sel.isWebbing=true;this.sel.vel=d.mult(p);}
+        if(this.sel.pokeKey==='dugtrio'&&this.act==='skill'){this.sel.isDigging=true;this.sel.vel=d.mult(p);this.flt(this.sel.pos,"구멍파기!","#e67e22");}
+        if(this.sel.pokeKey==='gholdengo'&&this.act==='skill'){this.sel.goldRushTimer=120;this.flt(this.sel.pos,"골드러시!","#f1c40f");}
+        if(this.sel.pokeKey==='incineroar'&&this.act==='skill'){this.sel.swingReady=true;this.sel.vel=d.mult(p);}
+        this.ds=null;this.sel=null;
+    }
+    skl(s,d,p){
+        const k=s.pokeKey;
+        if(k==='daepomuno')this.pjs.push(new Projectile(s.pos.x,s.pos.y,d.mult(20),'water',s.radius*0.8,s.owner));
+        else if(k==='greninja')[-0.2,0,0.2].forEach(a=>{let rx=d.x*Math.cos(a)-d.y*Math.sin(a),ry=d.x*Math.sin(a)+d.y*Math.cos(a);this.pjs.push(new Projectile(s.pos.x,s.pos.y,new Vector(rx,ry).mult(18),'shuriken',s.radius*0.4,s.owner));});
+        else if(k==='zangoose'){this.eff.push({t:'slash',p:s.pos,d:d,l:15});this.sts.forEach(t=>{if(t!==s&&!t.isDead&&!t.isGhost&&t.owner!==s.owner&&t.pos.sub(s.pos).mag()<s.radius*4.5){if(Math.acos(t.pos.sub(s.pos).normalize().x*d.x+t.pos.sub(s.pos).normalize().y*d.y)<1.0){t.vel=t.pos.sub(s.pos).normalize().mult(20);this.flt(t.pos,"베어가르기!","white");}}});}
+        else if(k==='tinkaton'||k==='shiftry'){const rng=k==='shiftry'?7:5,frc=k==='shiftry'?45:25,col=k==='shiftry'?'#27ae60':'#ff79c6';this.eff.push({t:'hammer',p:s.pos,d:d,l:20,c:col});this.sts.forEach(t=>{if(t!==s&&!t.isDead&&!t.isGhost&&t.owner!==s.owner&&t.pos.sub(s.pos).mag()<s.radius*rng){if(Math.acos(t.pos.sub(s.pos).normalize().x*d.x+t.pos.sub(s.pos).normalize().y*d.y)<1.0){t.vel=t.pos.sub(s.pos).normalize().mult(frc);this.flt(t.pos,k==='shiftry'?"폭풍!":"거대해머!",col);}}});}
+        else if(k==='toxtricity')this.pjs.push(new Projectile(s.pos.x,s.pos.y,d.mult(22),'soundwave',s.radius*0.6,s.owner));
+        else if(k==='gardevoir'){let n=null,md=9999;this.sts.forEach(o=>{if(!o.isDead&&!o.isGhost&&o.owner!==s.owner){let d=o.pos.dist(s.pos);if(d<md){md=d;n=o;}}});if(n){let te=null,md2=9999;this.sts.forEach(o=>{if(!o.isDead&&!o.isGhost&&o!==n&&o.owner===n.owner){let d=o.pos.dist(n.pos);if(d<md2){md2=d;te=o;}}});let ad=te?te.pos.sub(n.pos).normalize():new Vector(Math.random()-0.5,Math.random()-0.5).normalize();n.vel=ad.mult(25);this.flt(n.pos,"조종당함!","purple");}}
+        else if(k==='garchomp'){this.eff.push({t:'wiper',p:s.pos,d:d,l:20});this.sts.forEach(t=>{if(t!==s&&!t.isDead&&!t.isGhost&&t.owner!==s.owner&&t.pos.sub(s.pos).mag()<s.radius*5){if(Math.acos(t.pos.sub(s.pos).normalize().x*d.x+t.pos.sub(s.pos).normalize().y*d.y)<1.2){let rd=new Vector(d.y,-d.x);t.vel=t.vel.add(rd.mult(20)).add(d.mult(5));this.flt(t.pos,"쓸어내기!","#2980b9");}}});}
+        else if(k==='marowak')this.pjs.push(new Projectile(s.pos.x,s.pos.y,d.mult(18),'bone',s.radius*0.6,s.owner));
+        else if(k==='dhelmise')this.pjs.push(new Projectile(s.pos.x,s.pos.y,d.mult(18),'anchor',s.radius*0.6,s.owner));
+    }
+    cpu(){
+        if(this.mode !== 'cpu') return;
+        this.ph='proc'; this.processingTurn=true;
+        setTimeout(()=>{
+            const ms=this.sts.filter(s=>!s.isDead&&!s.isGhost&&s.trappedTurns<=0&&s.stunnedTurns<=0&&!s.isSleeping&&!s.isResting&&s.owner==='cpu'&&s.frozenTurns<=0);
+            let activeMs = ms; if(this.nightmareMode) activeMs = ms.filter(s => s.inNightmare);
+            if(activeMs.length===0){if(!this.nightmareMode && this.chk()) return; this.flt(new Vector(this.cvs.width/2,this.cvs.height/2),"CPU 행동 불가!","red"); this.end(true);return;}
+            const a=activeMs[Math.floor(Math.random()*activeMs.length)];a.hitVictims=[];
+            let targets = this.sts.filter(s=>!s.isDead&&!s.isGhost&&s.trappedTurns<=0&&s.owner==='player');
+            if(this.nightmareMode) targets = targets.filter(s => s.inNightmare);
+            if(targets.length===0 && !this.nightmareMode){this.chk();return;}
+            if(targets.length===0 && this.nightmareMode){this.end(true);return;}
+            const df = window.cpuDifficulty;
+            let t = null, d = null, p = 0;
+            if(df === 'easy') {
+                t = targets[Math.floor(Math.random()*targets.length)]; d = new Vector(Math.random()-0.5, Math.random()-0.5).normalize(); if(Math.random() < 0.4) d = t.pos.sub(a.pos).normalize(); p = 10 + Math.random() * 10;
+            } else if (df === 'normal') {
+                t = targets[Math.floor(Math.random()*targets.length)]; d = t.pos.sub(a.pos).normalize(); p = 15 + Math.random() * 10;
+            } else { 
+                let minD = 9999; targets.forEach(pl => { let dist = a.pos.dist(pl.pos); if(dist < minD){ minD = dist; t = pl; }}); d = t.pos.sub(a.pos).normalize(); p = 20 + Math.random() * 5;
+            }
+            if(a.isSlowed) p *= 0.8; if(a.isEvolved) p *= 1.5;
+            let act='move'; let skProb = (df==='easy')?0.2 : (df==='normal')?0.5 : 0.8;
+            if(a.data.type==='active'&&a.usesLeft>0&&Math.random()<skProb)act='skill';
+            if(a.pokeKey==='bastiodon'&&a.ironDefenseCooldown>0)act='move';
+            if(a.isThrashing) act='move'; 
+            this.ph='mov';this.chg=false;this.tmr=0;this.processingTurn=false;
+            a.firedByOwner = true; a.hitCount = 0;
+            if(act==='move')a.vel=d.mult(p); else this.castSkill(a, d, p);
+        },500);
+    }
+    loop(){
+        this.ctx.clearRect(0,0,this.cvs.width,this.cvs.height);
+        if(window.boardImg){this.ctx.drawImage(window.boardImg, 0, 0, this.cvs.width, this.cvs.height);} else {
+            this.ctx.fillStyle = '#90D476'; this.ctx.fillRect(0, 0, this.cvs.width, this.cvs.height);
+            this.ctx.beginPath(); this.ctx.moveTo(0, this.cvs.height / 2); this.ctx.lineTo(this.cvs.width, this.cvs.height / 2); this.ctx.strokeStyle = 'white'; this.ctx.lineWidth = 2; this.ctx.stroke();
+            const cx = this.cvs.width / 2; const cy = this.cvs.height / 2; const r = 80; 
+            this.ctx.beginPath(); this.ctx.arc(cx, cy, r + 5, 0, Math.PI * 2); this.ctx.fillStyle = 'rgba(0,0,0,0.2)'; this.ctx.fill();
+            this.ctx.beginPath(); this.ctx.arc(cx, cy, r, Math.PI, 0); this.ctx.fillStyle = '#FF3F3F'; this.ctx.fill();
+            this.ctx.beginPath(); this.ctx.arc(cx, cy, r, 0, Math.PI); this.ctx.fillStyle = 'white'; this.ctx.fill();
+            this.ctx.beginPath(); this.ctx.rect(cx - r, cy - 8, r * 2, 16); this.ctx.fillStyle = '#222'; this.ctx.fill();
+            this.ctx.beginPath(); this.ctx.arc(cx, cy, r, 0, Math.PI * 2); this.ctx.strokeStyle = '#222'; this.ctx.lineWidth = 5; this.ctx.stroke();
+            this.ctx.beginPath(); this.ctx.arc(cx, cy, 25, 0, Math.PI * 2); this.ctx.fillStyle = 'white'; this.ctx.fill(); this.ctx.strokeStyle = '#222'; this.ctx.lineWidth = 6; this.ctx.stroke();
+        }
+        this.wbs.forEach(w=>{this.ctx.beginPath();this.ctx.arc(w.pos.x,w.pos.y,w.radius,0,Math.PI*2);this.ctx.fillStyle='rgba(200,200,200,0.5)';this.ctx.fill();this.ctx.strokeStyle='white';this.ctx.stroke();});
+        this.winds.forEach(w=>{this.ctx.beginPath();this.ctx.arc(w.pos.x,w.pos.y,w.radius,0,Math.PI*2);this.ctx.fillStyle='rgba(129, 236, 236, 0.3)';this.ctx.fill();this.ctx.strokeStyle='rgba(129, 236, 236, 0.8)';this.ctx.stroke();});
+        this.coins.forEach(c => {this.ctx.beginPath(); this.ctx.arc(c.pos.x, c.pos.y, c.radius, 0, Math.PI*2); this.ctx.fillStyle='gold'; this.ctx.fill(); this.ctx.strokeStyle='#d35400'; this.ctx.stroke(); this.ctx.fillStyle='black'; this.ctx.font='10px sans-serif'; this.ctx.textAlign='center'; this.ctx.fillText('$', c.pos.x, c.pos.y+4);});
+        for(let i=this.eff.length-1;i>=0;i--){let e=this.eff[i];e.l--;
+            if(e.t==='slash'||e.t==='hammer'||e.t==='wiper'){this.ctx.beginPath();this.ctx.moveTo(e.p.x,e.p.y);this.ctx.arc(e.p.x,e.p.y,e.t==='hammer'?130:100,Math.atan2(e.d.y,e.d.x)-(e.t==='hammer'?0.8:0.5),Math.atan2(e.d.y,e.d.x)+(e.t==='hammer'?0.8:0.5));let c=e.c||`rgba(255,255,255,${e.l/15*0.5})`;if(e.t==='wiper')c=`rgba(41,128,185,${e.l/20*0.6})`;this.ctx.fillStyle=c;this.ctx.fill();}
+            if(e.t==='tropkick'){this.ctx.save(); this.ctx.translate(e.p.x, e.p.y); this.ctx.rotate(Math.atan2(e.d.y, e.d.x)); this.ctx.fillStyle = `rgba(214, 48, 49, ${e.l/20*0.6})`; this.ctx.fillRect(0, -20, 220, 40); this.ctx.restore();}
+            if(e.l<=0)this.eff.splice(i,1);
+        }
+        for(let i=this.pjs.length-1;i>=0;i--){let p=this.pjs[i];p.update();p.draw(this.ctx);if(p.pos.x<0||p.pos.x>this.cvs.width||p.pos.y<0||p.pos.y>this.cvs.height||p.life<=0){this.pjs.splice(i,1);continue;}let h=false;for(let s of this.sts){if(!s.isDead&&s.trappedTurns<=0&&s.owner!==p.owner){
+            if(this.nightmareMode && (!s.inNightmare || !p.owner)) continue;
+            if(s.isGhost) continue; 
+            if(s.pokeKey === 'shedinja' && s.owner !== p.owner){const allies = this.sts.filter(a => !a.isDead && a.owner===s1.owner && a.id!==s1.id); if(allies.length > 0) continue; }
+            let shielded = false;
+            if(s.pokeKey === 'vespiquen'){for(let m of s.minions){if(m.active && s.pos.add(m.offset).dist(p.pos) < 22 + p.radius){ m.active = false; shielded = true; this.flt(s.pos, "방어!", "#f1c40f"); break;}}}
+            if(shielded){ h=true; break; }
+            if(s.pos.dist(p.pos)<s.radius+p.radius){
+                if(s.isSleeping){s.isSleeping=false;this.flt(s.pos,"기상!","white");}
+                if(s.disguise){s.disguise=false;this.flt(s.pos,"탈 벗겨짐!","orange");}else if(!s.isDigging){let f=p.vel.normalize().mult(10);if(p.type==='coin')f=p.vel.normalize().mult(3);s.vel=s.vel.add(f);if(p.type==='soundwave'){s.isParalyzed=true;this.flt(s.pos,"마비!","yellow");}
+        if(p.type==='bone'){let next=null,md=9999;this.sts.forEach(t=>{if(t!==s&&!t.isDead&&!t.isGhost&&t.owner!==p.owner&&s.pos.dist(t.pos)<md){md=s.pos.dist(t.pos);next=t;}});if(next){this.pjs.push(new Projectile(s.pos.x,s.pos.y,next.pos.sub(s.pos).normalize().mult(15),'bone_bounce',p.radius,p.owner));}}
+        if(p.type==='anchor'){s.stunnedTurns=2; let shooter = this.sts.find(shooter=>!shooter.isDead && shooter.owner===p.owner && shooter.pokeKey==='dhelmise'); if(shooter) {let pullVec = s.pos.sub(shooter.pos).normalize().mult(shooter.radius + s.radius + 5); s.pos = shooter.pos.add(pullVec); s.vel = new Vector(0,0);} this.flt(s.pos,"앵커 샷!","#273c75");}
+        if(p.type==='spirit_arrow'){s.shadowBindTurns = 5; s.shadowCenter = s.pos.copy(); this.flt(s.pos, "그림자 족쇄!", "#009432");}
+        if(p.type==='fist'){s.vel = s.vel.add(p.vel.normalize().mult(5));}
+        }h=true;break;}}}if(h)this.pjs.splice(i,1);}
+        let am=false;
+        if(this.ph==='mov'){
+            this.sts.forEach(s=>{
+                s.update();
+                if(s.pokeKey === 'gimmighoul' && !s.isDead && !s.isEvolved){for(let i=this.coins.length-1; i>=0; i--){if(s.pos.dist(this.coins[i].pos) < s.radius + this.coins[i].radius){this.coins.splice(i, 1); s.coinsCollected++; this.flt(s.pos, "+1 코인", "gold"); if(s.coinsCollected >= 10){s.isEvolved=true; s.pokeKey='gholdengo'; s.data={name:'타부자고', color:'#f1c40f', type: 'active', skill: 'goldrush', desc: '전방 골드러시 탄막'}; if(window.POKEMON_DB['gimmighoul'].tokenImg) s.data.img = window.POKEMON_DB['gimmighoul'].tokenImg; s.mass*=1.5; s.radius*=1.2; this.flt(s.pos, "진화! 타부자고!", "#f1c40f");}}}}
+                if(s.isPunching && s.punchTicks < s.punchCount * 5){am=true; if(s.punchTicks % 5 === 0){let spread = new Vector(s.punchDir.y, -s.punchDir.x).mult((Math.random()-0.5)*0.5); let pDir = s.punchDir.add(spread).normalize(); let fist = new Projectile(s.pos.x, s.pos.y, pDir.mult(20), 'fist', 8, s.owner); fist.life = 15; this.pjs.push(fist);} s.punchTicks++; if(s.punchTicks >= s.punchCount * 5) {s.isPunching = false; if(s.punchCount > 5) s.punchCount = 5;}}
+                if(!s.isDead && !s.isGhost){
+                    if(s.vel.mag()>0)am=true;
+                    if(s.isWebbing&&this.wbs.length<50){if(this.wbs.length===0||s.pos.dist(this.wbs[this.wbs.length-1].pos)>20)this.wbs.push(new Web(new Vector(s.pos.x,s.pos.y)));}
+                    if(s.isTailwindActive){if(this.tmr%10===0)this.winds.push(new Wind(new Vector(s.pos.x,s.pos.y)));}
+                    if(s.goldRushTimer>0){am=true;s.goldRushTimer--;if(s.goldRushTimer%5===0){let d=new Vector((Math.random()-0.5)*0.5,1).normalize();if(s.owner==='player')d.y=-1;this.pjs.push(new Projectile(s.pos.x,s.pos.y,d.mult(15),'coin',s.radius*0.3,s.owner));}}
+                    if(s.popBombStacks>0){s.popBombStacks--;am=true;if(s.popBombStacks%10===0){let d=new Vector(Math.random()-0.5,Math.random()-0.5).normalize();s.vel=s.vel.add(d.mult(5));this.flt(s.pos,"톡!","#fff");}}
+                    if(s.swingState){am=true;s.swingState.timer--;s.swingState.angle+=0.5;let v=s.swingState.victim;if(v){let rad=s.radius*2.5;v.pos.x=s.pos.x+Math.cos(s.swingState.angle)*rad;v.pos.y=s.pos.y+Math.sin(s.swingState.angle)*rad;this.sts.forEach(t=>{if(t!==s&&t!==v&&!t.isDead&&!t.isGhost&&v.pos.dist(t.pos)<v.radius+t.radius){t.vel=v.pos.sub(s.pos).normalize().mult(25);this.flt(t.pos,"래리어트!","red");}});}if(s.swingState.timer<=0){if(v){v.isGrabbed=false;v.vel=new Vector(Math.cos(s.swingState.angle),Math.sin(s.swingState.angle)).mult(25);this.flt(v.pos,"던지기!","red");}s.swingState=null;}}
+                }
+            });
+            if(this.pjs.length>0)am=true;if(this.eff.length>0)am=true;
+            this.winds.forEach(w=>{this.sts.forEach(s=>{if(s.owner === this.turn && !s.isGhost && s.pos.dist(w.pos) < s.radius + w.radius) {s.vel = s.vel.mult(1.02);}});});
+            this.col();this.bnd();this.chkWeb();
+            if(!am&&!this.chg){
+                this.sts.forEach(s => {
+                    if(!s.isDead && s.pokeKey === 'vespiquen' && s.owner === this.turn && s.minions.some(m=>m.active)){
+                        let target = null, md=9999;
+                        this.sts.forEach(t => { if(!t.isDead && !t.isGhost && t.owner!==s.owner){let d = s.pos.dist(t.pos); if(d < md){ md = d; target = t; } } });
+                        if(target && md < 300){s.minions.forEach(m=>{if(m.active){let pj = new Projectile(s.pos.x+m.offset.x, s.pos.y+m.offset.y, target.pos.sub(s.pos).normalize().mult(5), 'combee', 14, s.owner); if(s.data.tokenImg) pj.img = s.data.tokenImg; this.pjs.push(pj);}}); this.flt(s.pos, "호위 공격!", "#f1c40f");}
+                    }
+                });
+                this.chg=true;setTimeout(()=>this.end(),200);
+            }else if(this.ph==='mov'){this.tmr++;if(this.tmr>600)this.fst();}
+        }
+        if(this.nightmareMode){this.sts.forEach(s => { if(s.inNightmare) s.draw(this.ctx); });} else {this.sts.forEach(s => s.draw(this.ctx));}
+        if(this.ph==='aim'&&this.sel&&this.ds)this.dam();
+        requestAnimationFrame(()=>this.loop());
+    }
+    chkWeb(){this.sts.forEach(s=>{if(!s.isDead&&s.vel.mag()>0&&!s.isDigging){for(let w of this.wbs){if(s.pos.dist(w.pos)<s.radius+w.radius)s.vel=s.vel.mult(0.9);}}});}
+    fst(){this.sts.forEach(s=>s.vel=new Vector(0,0));this.pjs=[];this.eff=[];if(!this.chg){this.chg=true;this.end();}}
+    bnd(){this.sts.forEach(s=>{if(s.isDead) return; if(s.isGhost) return; if(s.pos.x<-s.radius || s.pos.x>this.cvs.width+s.radius || s.pos.y<-s.radius || s.pos.y>this.cvs.height+s.radius){this.kil(s, null);}});}
+    trp(v,t){v.trappedTurns=3; v.vel=new Vector(0,0); v.pos=t.pos.copy(); v.trappedBy=t.id; t.vel=t.vel.mult(0.5); this.flt(t.pos,"가두기!","purple");}
+    haw(a,v){if(!a.hitVictims.includes(v.id)){a.hitVictims.push(v.id); if(a.hitVictims.length>=2){a.hitVictims.forEach(vid=>{const t=this.sts.find(s=>s.id===vid); if(t&&!t.isParalyzed){t.isParalyzed=true; this.flt(t.pos,"플라잉프레스!","orange");}});}}}
+    manec(a,v){a.hasRicocheted=true; let n=null,md=9999; this.sts.forEach(t=>{if(t!==a&&t!==v&&!t.isDead&&t.owner!==a.owner){let d=a.pos.dist(t.pos); if(d<md){md=d;n=t;}}}); if(n){let dir=n.pos.sub(a.pos).normalize();a.vel=dir.mult(20);this.flt(a.pos,"볼트체인지!","#f1c40f");}}
+    cleanse(s){s.frozenTurns=0;s.isParalyzed=false;s.isSalted=false;s.isSlowed=false;s.markedByBisharp=false;s.cursed=false; this.flt(s.pos,"치료!","#00b894");}
+    enterNightmare(darkrai, victim){
+        if(victim.pokeKey === 'gimmighoul' && !victim.isEvolved) { } // Safety
+        darkrai.wantsNightmare = false; this.nightmareMode = true; this.nightmareTimer = 5; this.nightmarePair = [darkrai, victim]; darkrai.inNightmare = true; victim.inNightmare = true; document.getElementById('game-wrapper').classList.add('nightmare-mode'); this.flt(new Vector(this.cvs.width/2, this.cvs.height/2), "악몽의 영역!", "white");
+    }
+    exitNightmare(winner){this.nightmareMode = false; document.getElementById('game-wrapper').classList.remove('nightmare-mode'); if(!winner){const victim = this.nightmarePair.find(s => s.pokeKey !== 'darkrai'); if(victim && !victim.isDead) {victim.isSleeping = true; this.flt(victim.pos, "영원한 잠...", "purple");}} this.sts.forEach(s => s.inNightmare = false); this.nightmarePair = [];}
+    chk(){
+        const pa=this.sts.filter(s=>!s.isDead && !s.isGhost && s.owner==='player').length;
+        const ca=this.sts.filter(s=>!s.isDead && !s.isGhost && s.owner==='cpu').length;
+        if(pa===0){this.gov(this.mode==='pvp'?"Player 2 (Top) 승리!":"CPU 승리!");return true;}
+        if(ca===0){this.gov(this.mode==='pvp'?"Player 1 (Bottom) 승리!":"플레이어 승리!");return true;}
+        return false;
+    }
+    gov(m){document.getElementById('result-text').innerText=m;document.getElementById('modal').style.display='flex';this.ph='gov';}
+    updUI(){
+        const i=document.getElementById('turn-indicator');
+        let tText = "";
+        let color = "";
+        if (this.turn === 'player') {
+            tText = this.mode === 'pvp' ? "Player 1 (Bottom) 턴" : "나의 턴";
+            color = "rgba(52,152,219,0.8)";
+        } else {
+            tText = this.mode === 'pvp' ? "Player 2 (Top) 턴" : "상대 턴 (CPU)";
+            color = "rgba(231,76,60,0.8)";
+        }
+        if(this.nightmareMode) {
+            tText += " (악몽의 영역)";
+            color = "#2d3436";
+        }
+        i.innerText = tText;
+        i.style.background = `linear-gradient(to bottom, ${color}, transparent)`;
+        if(this.mode === 'cpu' && this.turn === 'cpu') this.ctl(false);
+    }
+    ctl(s){
+        const p=document.getElementById('control-panel');
+        if(s){
+            p.classList.remove('hidden-controls');
+            const k=this.sel;
+            if(!k || !k.data) return;
+            document.getElementById('selected-info').innerText=`${k.data.name}: ${k.data.desc}`;
+            const b=document.getElementById('btn-skill');
+            if(k.data.type==='active'){
+                if(k.pokeKey==='bastiodon'){
+                    b.disabled=k.ironDefenseCooldown>0; b.innerText=k.ironDefenseCooldown>0?`쿨타임(${k.ironDefenseCooldown})`:"철벽방어(후)";
+                } else {
+                    if(k.usesLeft>0){b.disabled=false;b.innerText="특수기술";}else{b.disabled=true;b.innerText="사용완료";}
+                }
+                if(k.pokeKey==='dragapult') { b.disabled=true; b.innerText="유령(사망시)"; }
+                if(k.pokeKey==='teddiursa' && k.isEvolved) {
+                    if(!k.isThrashing && !k.isResting) { b.disabled=false; b.innerText="난동부리기"; }
+                    else if(k.isThrashing) { b.disabled=true; b.innerText=`난동 중(${k.thrashTurns})`; }
+                    else { b.disabled=true; b.innerText="휴식 중"; }
+                }
+                if(k.pokeKey==='salamence') {
+                    if(!k.isThrashing && !k.isResting) { 
+                        if(k.usesLeft>0){b.disabled=false; b.innerText="역린";}else{b.disabled=true;b.innerText="사용완료";}
+                    }
+                    else if(k.isThrashing) { b.disabled=true; b.innerText=`역린 중(${k.thrashTurns})`; }
+                    else { b.disabled=true; b.innerText="휴식 중"; }
+                }
+                if(k.pokeKey==='gimmighoul' && !k.isEvolved) { b.disabled=true; b.innerText=`코인(${k.coinsCollected}/10)`; }
+            }else{
+                b.disabled=true;b.innerText="패시브";
+            }
+        }else{
+            p.classList.add('hidden-controls');
+        }
+    }
+    dam(){
+        const s=this.sel.pos,p=this.ds.sub(this.dc);if(p.mag()>200)p.normalize().mult(200);const e=s.add(p);
+        this.ctx.beginPath();this.ctx.moveTo(s.x,s.y);this.ctx.lineTo(e.x,e.y);this.ctx.lineWidth=4;this.ctx.strokeStyle=(this.act==='skill')?'#e74c3c':'#fff';this.ctx.setLineDash([10,5]);this.ctx.stroke();this.ctx.setLineDash([]);
+        this.ctx.beginPath();this.ctx.arc(e.x,e.y,8,0,Math.PI*2);this.ctx.fillStyle=(this.act==='skill')?'#e74c3c':'#fff';this.ctx.fill();
+        if(this.act==='skill'&&this.sel.pokeKey==='zangoose'){this.ctx.beginPath();this.ctx.moveTo(s.x,s.y);this.ctx.arc(s.x,s.y,this.sel.radius*4,Math.atan2(p.y,p.x)-0.5,Math.atan2(p.y,p.x)+0.5);this.ctx.fillStyle='rgba(255,255,255,0.2)';this.ctx.fill();}
+        if(this.act==='skill'&&(this.sel.pokeKey==='tinkaton'||this.sel.pokeKey==='shiftry')){this.ctx.beginPath();this.ctx.moveTo(s.x,s.y);this.ctx.arc(s.x,s.y,this.sel.radius*(this.sel.pokeKey==='shiftry'?7:5),Math.atan2(p.y,p.x)-(this.sel.pokeKey==='shiftry'?1.0:0.8),Math.atan2(p.y,p.x)+(this.sel.pokeKey==='shiftry'?1.0:0.8));this.ctx.fillStyle=this.sel.pokeKey==='shiftry'?'rgba(39,174,96,0.2)':'rgba(255,100,200,0.2)';this.ctx.fill();}
+        if(this.act==='skill'&&this.sel.pokeKey==='gholdengo'){this.ctx.beginPath();this.ctx.moveTo(s.x,s.y);this.ctx.arc(s.x,s.y,this.sel.radius*6,Math.atan2(p.y,p.x)-0.6,Math.atan2(p.y,p.x)+0.6);this.ctx.fillStyle='rgba(241,196,15,0.2)';this.ctx.fill();}
+        if(this.act==='skill'&&this.sel.pokeKey==='tsareena'){this.ctx.beginPath();this.ctx.moveTo(s.x,s.y);this.ctx.arc(s.x,s.y,180,Math.atan2(p.y,p.x)-0.6,Math.atan2(p.y,p.x)+0.6);this.ctx.fillStyle='rgba(214, 48, 49, 0.2)';this.ctx.fill();}
+        if(this.act==='skill'&&this.sel.pokeKey==='machamp'){this.ctx.beginPath();this.ctx.moveTo(s.x,s.y);this.ctx.arc(s.x,s.y,100,Math.atan2(p.y,p.x)-0.4,Math.atan2(p.y,p.x)+0.4);this.ctx.fillStyle='rgba(127, 143, 166, 0.3)';this.ctx.fill();}
+    }
+    col(){for(let i=0;i<this.sts.length;i++){for(let j=i+1;j<this.sts.length;j++){let s1=this.sts[i],s2=this.sts[j];
+        if(s1.isGhost || s2.isGhost) continue;
+        if(this.nightmareMode){if(!s1.inNightmare || !s2.inNightmare) continue;}
+        if(s1.isDead||s2.isDead||s1.trappedTurns>0||s2.trappedTurns>0)continue;if(s1.isDigging||s2.isDigging||s1.isGrabbed||s2.isGrabbed)continue;let d=s1.pos.dist(s2.pos),md=s1.radius+s2.radius;
+        if(d<md){
+            let v1=s1.vel.mag(), v2=s2.vel.mag();
+            if(v1 > v2) s2.lastHitBy = s1.id; else s1.lastHitBy = s2.id;
+            if(s1.firedByOwner) s1.hitCount++; if(s2.firedByOwner) s2.hitCount++;
+            if(s1.pokeKey === 'shedinja' && s1.owner !== s2.owner){const allies = this.sts.filter(a => !a.isDead && a.owner===s1.owner && a.id!==s1.id); if(allies.length > 0 && s1.vel.mag() < s2.vel.mag()) continue; }
+            if(s2.pokeKey === 'shedinja' && s2.owner !== s1.owner){const allies = this.sts.filter(a => !a.isDead && a.owner===s2.owner && a.id!==s2.id); if(allies.length > 0 && s2.vel.mag() < s1.vel.mag()) continue; }
+            if(s1.isSleeping){s1.isSleeping=false;this.flt(s1.pos,"기상!","white");}
+            if(s2.isSleeping){s2.isSleeping=false;this.flt(s2.pos,"기상!","white");}
+            if(s1.pokeKey==='cofagrigus'&&s1.owner!==s2.owner&&s1.vel.mag()>s2.vel.mag()&&s1.vel.mag()>1.0){if(s1.usesLeft>0){this.trp(s2,s1); s1.usesLeft--; continue;}}
+            if(s2.pokeKey==='cofagrigus'&&s2.owner!==s1.owner&&s2.vel.mag()>s1.vel.mag()&&s2.vel.mag()>1.0){if(s2.usesLeft>0){this.trp(s1,s2); s2.usesLeft--; continue;}}
+            if(s1.pokeKey==='mareanie' && s2.pokeKey==='corsola'){s2.isDead=true; s1.isEvolved=true; s1.pokeKey='toxapex'; s1.data={name:'더시마사리',color:'#6a89cc'}; s1.mass*=1.5; s1.radius*=1.3; if(window.POKEMON_DB['mareanie'].tokenImg) s1.data.img = window.POKEMON_DB['mareanie'].tokenImg; this.flt(s1.pos, "포식 진화!", "#6a89cc"); continue;}
+            if(s2.pokeKey==='mareanie' && s1.pokeKey==='corsola'){s1.isDead=true; s2.isEvolved=true; s2.pokeKey='toxapex'; s2.data={name:'더시마사리',color:'#6a89cc'}; s2.mass*=1.5; s2.radius*=1.3; if(window.POKEMON_DB['mareanie'].tokenImg) s2.data.img = window.POKEMON_DB['mareanie'].tokenImg; this.flt(s2.pos, "포식 진화!", "#6a89cc"); continue;}
+            if(s1.pokeKey==='toxapex' && s1.owner!==s2.owner){if(s2.toxicTurns===0) s2.toxicTurns=6; this.flt(s2.pos, "맹독!", "#8e44ad");}
+            if(s2.pokeKey==='toxapex' && s2.owner!==s1.owner){if(s1.toxicTurns===0) s1.toxicTurns=6; this.flt(s1.pos, "맹독!", "#8e44ad");}
+            if(s1.pokeKey==='mismagius' && !s1.chantUsedOn.includes(s2.id)){s1.chantUsedOn.push(s2.id); if(s1.owner !== s2.owner) { s2.cursed = true; this.flt(s2.pos, "저주!", "#574b90"); } else { s2.blessed = true; this.flt(s2.pos, "축복!", "#574b90"); }}
+            if(s2.pokeKey==='mismagius' && !s2.chantUsedOn.includes(s1.id)){s2.chantUsedOn.push(s1.id); if(s2.owner !== s1.owner) { s1.cursed = true; this.flt(s1.pos, "저주!", "#574b90"); } else { s1.blessed = true; this.flt(s1.pos, "축복!", "#574b90"); }}
+            if(s1.owner===s2.owner){
+                if(s1.waterloggedTurns>0){s1.waterloggedTurns=0;this.flt(s1.pos,"구조 성공!","cyan");}if(s2.waterloggedTurns>0){s2.waterloggedTurns=0;this.flt(s2.pos,"구조 성공!","cyan");}
+                if(s1.wantsDecor&&!s2.isDecorated){s2.isDecorated=true;s1.wantsDecor=false;this.flt(s2.pos,"강화됨!","#ffb8b8");}
+                if(s2.wantsDecor&&!s1.isDecorated){s1.isDecorated=true;s2.wantsDecor=false;this.flt(s1.pos,"강화됨!","#ffb8b8");}
+                if(s1.pokeKey==='comfey'&&!s1.isDead){s1.isDead=true;s2.hasComfey=true;this.flt(s2.pos,"합체!","#a29bfe");continue;}
+                if(s2.pokeKey==='comfey'&&!s2.isDead){s2.isDead=true;s1.hasComfey=true;this.flt(s1.pos,"합체!","#a29bfe");continue;}
+                if(s1.pokeKey==='lilligant'&&s1.usesLeft>0){this.cleanse(s2);s1.usesLeft--;}
+                if(s2.pokeKey==='lilligant'&&s2.usesLeft>0){this.cleanse(s1);s2.usesLeft--;}
+            }
+            if(s1.pokeKey==='gengar'&&s1.owner===s2.owner)continue;if(s2.pokeKey==='gengar'&&s1.owner===s2.owner)continue;
+            let v1a=s1.vel.mag(),v2a=s2.vel.mag();
+            if(s1.swingReady&&s1.owner!==s2.owner&&!s2.disguise){s1.swingReady=false;s1.swingState={victim:s2,timer:60,angle:0};s2.isGrabbed=true;s1.vel=new Vector(0,0);s2.vel=new Vector(0,0);this.flt(s1.pos,"잡았다!","red");continue;}
+            if(s2.swingReady&&s2.owner!==s1.owner&&!s1.disguise){s2.swingReady=false;s2.swingState={victim:s1,timer:60,angle:0};s1.isGrabbed=true;s2.vel=new Vector(0,0);s1.vel=new Vector(0,0);this.flt(s2.pos,"잡았다!","red");continue;}
+            if(s1.pokeKey==='wobbuffet'&&s1.owner!==s2.owner&&s1.usesLeft>0&&v2>v1){s1.usesLeft--;s1.vel=new Vector(0,0);s2.vel=s2.vel.mult(-1.5);this.flt(s1.pos,"카운터!","#3498db");continue;}
+            if(s2.pokeKey==='wobbuffet'&&s2.owner!==s1.owner&&s2.usesLeft>0&&v1>v2){s2.usesLeft--;s2.vel=new Vector(0,0);s1.vel=s1.vel.mult(-1.5);this.flt(s2.pos,"카운터!","#3498db");continue;}
+            if(s1.canEat&&s1.owner!==s2.owner&&v1>v2&&v1>1.0){this.kil(s2,s1);s1.canEat=false;this.flt(s1.pos,"꿀꺽!","red");continue;}if(s2.canEat&&s1.owner!==s2.owner&&v2>v1&&v2>1.0){this.kil(s1,s2);s2.canEat=false;this.flt(s2.pos,"꿀꺽!","red");continue;}
+            if(s1.pokeKey==='maushold'&&s1.owner!==s2.owner&&s1.hitVictims.length===0){s1.hitVictims.push(s2.id);s2.popBombStacks=30;this.flt(s1.pos,"찍찍베기!","#ecf0f1");}
+            if(s2.pokeKey==='maushold'&&s2.owner!==s1.owner&&s2.hitVictims.length===0){s2.hitVictims.push(s1.id);s1.popBombStacks=30;this.flt(s2.pos,"찍찍베기!","#ecf0f1");}
+            if(s1.pokeKey==='manectric'&&s1.owner!==s2.owner&&!s1.hasRicocheted){this.manec(s1,s2);}if(s2.pokeKey==='manectric'&&s2.owner!==s1.owner&&!s2.hasRicocheted){this.manec(s2,s1);}
+            if(s1.pokeKey==='cofagrigus'&&s1.owner!==s2.owner&&v1>v2&&v1>1.0){this.trp(s2,s1);continue;}if(s2.pokeKey==='cofagrigus'&&s1.owner!==s2.owner&&v2>v1&&v2>1.0){this.trp(s1,s2);continue;}
+            if(s1.pokeKey==='garganacl'&&s1.owner!==s2.owner&&s1.usesLeft>0){s2.isSalted=true;s1.usesLeft--;this.flt(s2.pos,"소금절이!","#d35400");}if(s2.pokeKey==='garganacl'&&s1.owner!==s2.owner&&s2.usesLeft>0){s1.isSalted=true;s2.usesLeft--;this.flt(s1.pos,"소금절이!","#d35400");}
+            if(s1.pokeKey==='froslass'&&s1.owner!==s2.owner&&s1.usesLeft>0){s2.frozenTurns=2;s1.usesLeft--;this.flt(s2.pos,"얼음!","cyan");}if(s2.pokeKey==='froslass'&&s1.owner!==s2.owner&&s2.usesLeft>0){s1.frozenTurns=2;s2.usesLeft--;this.flt(s1.pos,"얼음!","cyan");}
+            if(s1.pokeKey==='pikachu'&&s1.owner!==s2.owner){s2.isParalyzed=true;this.flt(s2.pos,"마비!","yellow");}if(s2.pokeKey==='pikachu'&&s1.owner!==s2.owner){s1.isParalyzed=true;this.flt(s1.pos,"마비!","yellow");}
+            if(s1.pokeKey==='hawlucha'&&s1.owner!==s2.owner)this.haw(s1,s2);if(s2.pokeKey==='hawlucha'&&s1.owner!==s2.owner)this.haw(s2,s1);
+            if(s1.pokeKey==='araquanid'&&s1.owner!==s2.owner){if(s2.waterloggedTurns===0){s2.waterloggedTurns=4;this.flt(s2.pos,"물먹음(3턴)","#3498db");}}
+            if(s2.pokeKey==='araquanid'&&s1.owner!==s2.owner){if(s1.waterloggedTurns===0){s1.waterloggedTurns=4;this.flt(s1.pos,"물먹음(3턴)","#3498db");}}
+            if(s1.pokeKey==='aggron'&&s1.owner!==s2.owner&&Math.random()<0.3){s2.stunnedTurns=2;this.flt(s2.pos,"풀죽음!","#636e72");}
+            if(s2.pokeKey==='aggron'&&s1.owner!==s2.owner&&Math.random()<0.3){s1.stunnedTurns=2;this.flt(s1.pos,"풀죽음!","#636e72");}
+            if(s1.isPiercing&&s1.owner!==s2.owner){s2.markedByBisharp=true;this.flt(s2.pos,"베기!","red");}
+            if(s2.isPiercing&&s1.owner!==s2.owner){s1.markedByBisharp=true;this.flt(s1.pos,"베기!","red");}
+            if(s1.wantsNightmare && s1.owner!==s2.owner && !this.nightmareMode){this.enterNightmare(s1,s2);continue;}
+            if(s2.wantsNightmare && s2.owner!==s1.owner && !this.nightmareMode){this.enterNightmare(s2,s1);continue;}
+            if(s1.ironDefenseActive&&s1.owner!==s2.owner){s1.vel=new Vector(0,0);s2.vel=s2.vel.mult(-1);this.flt(s1.pos,"깡!","#95a5a6");continue;}
+            if(s2.ironDefenseActive&&s1.owner!==s2.owner){s2.vel=new Vector(0,0);s1.vel=s1.vel.mult(-1);this.flt(s2.pos,"깡!","#95a5a6");continue;}
+            let n=s2.pos.sub(s1.pos).normalize(),rv=s2.vel.sub(s1.vel),vn=rv.x*n.x+rv.y*n.y;if(vn>0)continue;
+            let e=0.8,m1=s1.mass,m2=s2.mass,j=-(1+e)*vn;j/=(1/m1+1/m2);let im=n.mult(j);
+            let force1 = im.copy(); let force2 = im.copy();
+            if(s1.isDecorated) im=im.mult(1.5); if(s2.isDecorated) im=im.mult(1.5);
+            if(s1.markedByBisharp) force1=force1.mult(1.5); if(s2.markedByBisharp) force2=force2.mult(1.5);
+            if(s1.cursed) force1=force1.mult(1.7); if(s2.cursed) force2=force2.mult(1.7);
+            if(s1.blessed) force1=force1.mult(0.5); if(s2.blessed) force2=force2.mult(0.5);
+            if(s1.hasComfey) force1=force1.mult(0.3); if(s2.hasComfey) force2=force2.mult(0.3);
+            if(s1.pokeKey==='scrafty') force1=force1.mult(1.0+s1.killCount*0.5); if(s2.pokeKey==='scrafty') force2=force2.mult(1.0+s2.killCount*0.5);
+            if(s1.pokeKey==='larvesta' && !s1.isEvolved) force1=force1.mult(1.5); if(s2.pokeKey==='larvesta' && !s2.isEvolved) force2=force2.mult(1.5);
+            if(s1.pokeKey==='larvesta' && s1.isEvolved) im=im.mult(1.5); if(s2.pokeKey==='larvesta' && s2.isEvolved) im=im.mult(1.5);
+            if(s1.pokeKey==='golisopod' && s1.usesLeft>0 && s1.owner===this.turn && !s1.firstImpressionUsed){force2=force2.mult(2.0); s1.usesLeft--; s1.firstImpressionUsed=true; this.flt(s1.pos,"만나자마자!","#b2bec3");}
+            if(s2.pokeKey==='golisopod' && s2.usesLeft>0 && s2.owner===this.turn && !s2.firstImpressionUsed){force1=force1.mult(2.0); s2.usesLeft--; s2.firstImpressionUsed=true; this.flt(s2.pos,"만나자마자!","#b2bec3");}
+            if(s1.isPiercing && s1.owner!==s2.owner) {s2.vel=s2.vel.add(s1.vel.normalize().mult(5)); s1.vel=s1.vel.mult(0.99); continue;}
+            if(s2.isPiercing && s1.owner!==s2.owner) {s1.vel=s1.vel.add(s2.vel.normalize().mult(5)); s2.vel=s2.vel.mult(0.99); continue;}
+            if(s1.disguise&&s1.owner!==s2.owner){s1.disguise=false;s1.vel=new Vector(0,0);this.flt(s1.pos,"탈 방어!","orange");s2.vel=s2.vel.add(force2.mult(1/m2));}
+            else if(s2.disguise&&s2.owner!==s1.owner){s2.disguise=false;s2.vel=new Vector(0,0);this.flt(s2.pos,"탈 방어!","orange");s1.vel=s1.vel.sub(force1.mult(1/m1));}
+            else{s1.vel=s1.vel.sub(force1.mult(1/m1));s2.vel=s2.vel.add(force2.mult(1/m2));}
+            let ov=md-d,cr=n.mult(ov/2);s1.pos=s1.pos.sub(cr);s2.pos=s2.pos.add(cr);
+        }}}
+    }
+    kil(v,k){if(v.isDead)return;v.isDead=true;v.vel=new Vector(0,0);
+        if(v.firedByOwner && v.hitCount === 0){if(v.pokeKey === 'dragapult' || v.pokeKey === 'teddiursa') return;}
+        if(v.pokeKey==='dragapult' && !v.isGhost){v.isDead = false; v.isGhost = true; if(v.pos.x < 30) v.pos.x = 30; if(v.pos.x > this.cvs.width-30) v.pos.x = this.cvs.width-30; if(v.pos.y < 30) v.pos.y = 30; if(v.pos.y > this.cvs.height-30) v.pos.y = this.cvs.height-30; v.ghostPos = v.pos.copy(); this.flt(v.pos, "유령화!", "#a29bfe"); return;}
+        if(v.pokeKey==='teddiursa' && !v.isEvolved){let ursaring = new Stone(Date.now(), v.pos.x, v.pos.y, v.owner, 'teddiursa'); ursaring.radius = v.radius * 1.3; ursaring.isEvolved = true; ursaring.data = { ...v.data, name: '링곰' }; if(v.data.tokenImg) ursaring.data.tokenImg = v.data.tokenImg; this.sts.push(ursaring); this.flt(v.pos, "어미부르기!", "#e1b12c");}
+        if(this.nightmareMode){if(this.nightmarePair.includes(v)){const survivor = this.nightmarePair.find(s => s !== v); this.exitNightmare(survivor); this.flt(v.pos, "악몽 속 죽음...", "red");}}
+        const mp=this.sts.find(s=>s.trappedBy===v.id&&!s.isDead);if(mp){this.kil(mp,null);this.flt(v.pos,"동반 탈락!","red");}
+        if(k&&k.pokeKey==='tauros'){k.mass+=0.5;k.radius*=1.1;this.flt(k.pos,"Bulk Up!","purple");}
+        if(k&&k.pokeKey==='scrafty'){k.killCount++;k.radius*=1.2;this.flt(k.pos,"자기과신!","#c0392b");}
+    }
+    end(force=false){
+        if(this.processingTurn && !force) return;
+        if(this.freeAction) {this.freeAction = false; this.ph='idle'; this.processingTurn = false; this.updUI(); return;}
+        this.chg=false; this.processingTurn=true;
+        if (this.resolvingTurnStart) {this.resolvingTurnStart = false; this.ph = 'idle'; this.processingTurn = false; if (this.mode === 'cpu' && this.turn === 'cpu') {this.cpu();} return;}
+        const nextTurn = (this.turn === 'player') ? 'cpu' : 'player';
+        let delayedAction = false;
+        if(this.nightmareMode){this.nightmareTimer--; if(this.nightmareTimer <= 0){this.exitNightmare(null);}}
+        this.sts.forEach(s=>{
+            if(s.frozenTurns>0)s.frozenTurns--;
+            if(s.stunnedTurns>0){s.stunnedTurns--; if(s.stunnedTurns === 0) s.isResting = false;}
+            if(s.trappedTurns>0){s.trappedTurns--; if(s.trappedTurns===0){s.pos=s.pos.add(new Vector((Math.random()-0.5)*20,(Math.random()-0.5)*20)); s.trappedBy=null;this.flt(s.pos,"탈출!","white");}}
+            s.isWebbing=false; s.isPiercing=false; s.isTailwindActive=false;
+            if(s.isSalted)s.saltStacks++;
+            s.hasFiredThisTurn = false; s.firstImpressionUsed = false; s.firedByOwner = false; 
+            if(s.shadowBindTurns>0) s.shadowBindTurns--;
+            if(s.toxicTurns>0){s.toxicTurns--; if(s.toxicTurns===0) { this.kil(s,null); this.flt(s.pos, "맹독사!", "#8e44ad"); }}
+            if(((s.pokeKey==='teddiursa' && s.isEvolved) || s.pokeKey==='salamence') && s.isThrashing && !s.isDead && s.owner === nextTurn){
+                 s.thrashTurns--;
+                 if(s.thrashTurns > 0){
+                     delayedAction = true; this.resolvingTurnStart = true;
+                     let target = null, md = 9999;
+                     this.sts.forEach(t => { if(!t.isDead && !t.isGhost && t.owner!==s.owner){let d = s.pos.dist(t.pos); if(d < md){ md = d; target = t; } } });
+                     if(target){s.vel = target.pos.sub(s.pos).normalize().mult(25); this.flt(s.pos, "크아앙!", "#e1b12c");} else {s.vel = new Vector(Math.random()-0.5, Math.random()-0.5).normalize().mult(15);}
+                 } else {s.isThrashing = false; s.isResting = true; s.stunnedTurns = 1; this.flt(s.pos, "지침...", "gray");}
+            }
+            if(s.isDigging && s.owner === nextTurn && !s.isDead){
+                if(this.nightmareMode && !s.inNightmare) {} else {s.isDigging=false; delayedAction=true; this.resolvingTurnStart = true; this.flt(s.pos,"지진!","#e67e22"); this.sts.forEach(t=>{if(this.nightmareMode && (!t.inNightmare || !s.inNightmare)) return; if(t!==s&&!t.isDead&&t.owner!==s.owner&&s.pos.dist(t.pos)<s.radius*5)t.vel=t.pos.sub(s.pos).normalize().mult(25);});}
+            }
+            if(s.ironDefenseCooldown>0) s.ironDefenseCooldown--;
+            if(s.wantsIronDefense){s.wantsIronDefense=false;s.ironDefenseActive=true;} else if(s.ironDefenseActive && s.owner === nextTurn) {s.ironDefenseActive=false;} 
+            if(s.waterloggedTurns>0){s.waterloggedTurns--;if(s.waterloggedTurns===0)this.kil(s,null);}
+            if(s.pokeKey==='larvesta' && !s.isDead && !s.isEvolved){s.evolutionTurn++; if(s.evolutionTurn >= 5){s.isEvolved=true; s.mass*=1.5; s.radius*=1.2; this.flt(s.pos, "진화! 불카모스!", "#ff7675");}}
+        });
+        for(let i=this.winds.length-1; i>=0; i--){this.winds[i].life--; if(this.winds[i].life <= 0) this.winds.splice(i, 1);}
+        if(this.chk()) return;
+        this.turn = nextTurn;
+        this.updUI();
+        let relevantUnits = this.sts.filter(s => !s.isDead && s.owner === nextTurn);
+        if(this.nightmareMode) relevantUnits = relevantUnits.filter(s => s.inNightmare);
+        const incapacitatedUnits = relevantUnits.filter(s => s.stunnedTurns > 0 || s.frozenTurns > 0 || s.isSleeping || s.isResting);
+        if(relevantUnits.length > 0 && relevantUnits.length === incapacitatedUnits.length && !delayedAction) {this.flt(new Vector(this.cvs.width/2, this.cvs.height/2), "행동 불가!", "red"); setTimeout(() => this.end(true), 1000); return;}
+        if(delayedAction){this.ph='mov'; this.processingTurn=false;} else {this.ph = 'idle'; this.processingTurn=false; if(this.mode === 'cpu' && this.turn === 'cpu') {this.cpu();}}
+    }
+    flt(p,t,c){const e=document.createElement('div');e.className='floating-text';e.innerText=t;e.style.left=p.x+'px';e.style.top=p.y+'px';e.style.color=c;document.getElementById('game-wrapper').appendChild(e);setTimeout(()=>e.remove(),1000);}
+}
+</script>
+</body>
+</html>
